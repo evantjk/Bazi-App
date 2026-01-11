@@ -15,7 +15,7 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { chart, currentYear } = req.body; // 接收 currentYear (如 2026)
+    const { chart, currentYear } = req.body; 
     
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
@@ -28,7 +28,7 @@ app.post('/api/analyze', async (req, res) => {
 
     const prompt = `
       (角色：精通《穷通宝鉴》、《三命通会》与《麻衣神相》的资深命理大师)
-      (任务：八字全盘分析 + 容貌画像 + 2026流年运势)
+      (任务：八字全盘分析 + 容貌画像 + ${currentYear}流年运势)
       
       【基本信息】
       八字：${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
@@ -37,8 +37,8 @@ app.post('/api/analyze', async (req, res) => {
       大运：${chart.daYun.map(d => d.ganZhi).join(', ')} (AI请自行推算当前大运)
       当前流年：${currentYear}年 (丙午年)
 
-      【分析要求 (返回纯JSON)】
-      请返回一个纯 JSON 对象，必须包含以下字段：
+      【分析要求 (必须返回纯JSON)】
+      请返回一个纯 JSON 对象，不要包含任何Markdown标记或额外的文字，必须严格包含以下字段：
 
       1. "archetype": 命格赐名 (如“金水相涵格”)。
       2. "score": 命局评分 (0-100)。
@@ -54,7 +54,7 @@ app.post('/api/analyze', async (req, res) => {
          - 重点分析：事业、财运、感情的变化。
          - 给出具体的吉凶预警 (150字左右)。
 
-      6. "historicalFigures": 5个相似历史人物 (name, similarity, reason)。
+      6. "historicalFigures": 5个相似历史人物 (包含 name, similarity, reason)。
       7. "strengthAnalysis": 格局成败分析。
       8. "bookAdvice": 穷通宝鉴古文建议。
       9. "bookAdviceTranslation": 穷通宝鉴白话翻译。
@@ -66,8 +66,18 @@ app.post('/api/analyze', async (req, res) => {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
+    
+    // console.log("AI 原始返回:", text); // 调试用
 
-    const jsonString = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    // 🧹 核心修复：使用正则提取第一个 "{" 和最后一个 "}" 之间的内容
+    // 这能完美过滤掉 "```json" 或者结尾的 "希望这对你有帮助"
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    
+    if (!jsonMatch) {
+        throw new Error("AI 返回的内容不包含有效的 JSON 数据");
+    }
+
+    const jsonString = jsonMatch[0];
     const data = JSON.parse(jsonString);
 
     res.json(data);
