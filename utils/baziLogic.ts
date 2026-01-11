@@ -37,7 +37,6 @@ export interface BaziChart {
 
 // --- Constants & Maps ---
 
-// EXPORTED MAP (This was missing in the advanced version but needed by App.tsx)
 export const ELEMENT_CN_MAP: Record<ElementType, string> = {
   wood: '木',
   fire: '火',
@@ -123,10 +122,10 @@ export function calculateBazi(date: Date): BaziChart {
   // 5. Determine Strength
   const resourceElement = getGeneratingElement(dayMasterElement);
   const selfScore = scores[dayMasterElement];
-  constQbResourceScore = scores[resourceElement];
+  const resourceScore = scores[resourceElement]; // <--- Fixed line here
   const totalSystemScore = Object.values(scores).reduce((a, b) => a + b, 0);
   
-  const selfStrengthVal = selfScore + constQbResourceScore;
+  const selfStrengthVal = selfScore + resourceScore;
   const isStrong = selfStrengthVal > (totalSystemScore * 0.45);
   const strength = isStrong ? '身强' : '身弱';
 
