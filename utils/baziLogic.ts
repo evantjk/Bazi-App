@@ -1,118 +1,123 @@
-/**
- * NOTE: In a production environment, use 'lunar-typescript' for astronomical precision.
- * This is a simplified logic for the UI prototype to ensure immediate runnability 
- * without handling complex external dependency installation for the user.
- */
+import { Solar, Lunar } from 'lunar-typescript';
 
-const HEAVENLY_STEMS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
-const EARTHLY_BRANCHES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
-const ZODIAC = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+// --- 1. Type Definitions ---
 
-// Five Elements mapping for styling
-export const ELEMENT_MAP: Record<string, 'gold' | 'wood' | 'water' | 'fire' | 'earth'> = {
-  '甲': 'wood', '乙': 'wood',
-  '丙': 'fire', '丁': 'fire',
-  '戊': 'earth', '己': 'earth',
-  '庚': 'gold', '辛': 'gold',
-  '壬': 'water', '癸': 'water',
-  '寅': 'wood', '卯': 'wood',
-  '巳': 'fire', '午': 'fire',
-  '申': 'gold', '酉': 'gold',
-  '亥': 'water', '子': 'water',
-  '辰': 'earth', '戌': 'earth', '丑': 'earth', '未': 'earth'
+export interface FiveElementScore {
+  name: string;  // e.g., 'wood'
+  label: string; // e.g., '木'
+  score: number; // The count or percentage
+  color: string; // Hex code for UI
+}
+
+export interface BaziResult {
+  pillars: {
+    year: string;
+    month: string;
+    day: string;
+    hour: string;
+  };
+  scores: FiveElementScore[];
+}
+
+// --- 2. Constants & Maps ---
+
+// Maps internal English keys to Chinese display characters (This was missing previously)
+export const ELEMENT_CN_MAP: Record<string, string> = {
+  wood: '木',
+  fire: '火',
+  earth: '土',
+  gold: '金',
+  water: '水',
 };
 
-export interface Pillar {
-  stem: string;
-  branch: string;
-  zodiac: string;
-  elementStem: string;
-  elementBranch: string;
-}
+// Maps specific Chinese Stems/Branches to their Element
+// Note: 'gold' is used here instead of 'metal' to match your existing code conventions
+export const ELEMENT_MAP: Record<string, 'gold' | 'wood' | 'water' | 'fire' | 'earth'> = {
+  // Heavenly Stems (天干)
+  甲: 'wood', 乙: 'wood',
+  丙: 'fire', 丁: 'fire',
+  戊: 'earth', 己: 'earth',
+  庚: 'gold', 辛: 'gold',
+  壬: 'water', 癸: 'water',
 
-export interface BaziChart {
-  year: Pillar;
-  month: Pillar;
-  day: Pillar;
-  hour: Pillar;
-}
+  // Earthly Branches (地支) - Based on main Qi
+  寅: 'wood', 卯: 'wood',
+  巳: 'fire', 午: 'fire',
+  辰: 'earth', 戌: 'earth', 丑: 'earth', 未: 'earth',
+  申: 'gold', 酉: 'gold',
+  亥: 'water', 子: 'water',
+};
 
-function getElement(char: string) {
-  return ELEMENT_MAP[char] || 'earth';
-}
+export const ELEMENT_COLORS: Record<string, string> = {
+  wood: '#4ade80', // Green
+  fire: '#f87171', // Red
+  earth: '#fbbf24', // Yellow/Brown
+  gold: '#9ca3af', // Grey/Silver
+  water: '#60a5fa', // Blue
+};
 
-export function calculateBazi(date: Date): BaziChart {
-  // A simplified offset algorithm for the prototype. 
-  // Real Bazi requires Solar Terms (Jie Qi) calculation.
+// --- 3. Main Calculation Logic ---
+
+export const calculateBazi = (dateStr: string, timeStr: string): BaziResult => {
+  // Parse input (assumes YYYY-MM-DD and HH:mm)
+  const dateParts = dateStr.split('-').map(Number);
+  const timeParts = timeStr.split(':').map(Number);
+
+  // Create Solar object from input
+  const solar = Solar.fromYmdHms(
+    dateParts[0],
+    dateParts[1],
+    dateParts[2],
+    timeParts[0],
+    timeParts[1],
+    0
+  );
+
+  // Convert to Lunar to get BaZi characters
+  const lunar = solar.getLunar();
+
+  // Get the Four Pillars (GanZhi)
+  const yearPillar = lunar.getYearInGanZhi();
+  const monthPillar = lunar.getMonthInGanZhi();
+  const dayPillar = lunar.getDayInGanZhi();
+  const hourPillar = lunar.getTimeInGanZhi();
+
+  // Aggregate all 8 characters
+  const allChars = [
+    ...yearPillar.split(''),
+    ...monthPillar.split(''),
+    ...dayPillar.split(''),
+    ...hourPillar.split('')
+  ];
+
+  // Calculate Element Counts
+  const counts = { wood: 0, fire: 0, earth: 0, gold: 0, water: 0 };
   
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const day = date.getDate();
-  const hours = date.getHours();
+  allChars.forEach((char) => {
+    const element = ELEMENT_MAP[char];
+    if (element) {
+      counts[element]++;
+    }
+  });
 
-  // 1. Year Pillar (Mock calculation based on 1984 start of cycle)
-  const baseYear = 1984; // Jia Zi year
-  const offset = year - baseYear;
-  const stemIndex = (offset % 10 + 10) % 10;
-  const branchIndex = (offset % 12 + 12) % 12;
-
-  const yearPillar = {
-    stem: HEAVENLY_STEMS[stemIndex],
-    branch: EARTHLY_BRANCHES[branchIndex],
-    zodiac: ZODIAC[branchIndex],
-    elementStem: getElement(HEAVENLY_STEMS[stemIndex]),
-    elementBranch: getElement(EARTHLY_BRANCHES[branchIndex]),
-  };
-
-  // 2. Month Pillar (Simplified logic)
-  // Month stem depends on Year stem. Branch is roughly fixed to month index.
-  // Lunar month usually starts ~Feb 4th. This is an approximation.
-  const monthBranchIndex = (month + 2) % 12; // Feb is Yin (Tiger, index 2)
-  const monthStemIndex = (stemIndex * 2 + monthBranchIndex) % 10;
-  
-  const monthPillar = {
-    stem: HEAVENLY_STEMS[monthStemIndex],
-    branch: EARTHLY_BRANCHES[monthBranchIndex],
-    zodiac: ZODIAC[monthBranchIndex],
-    elementStem: getElement(HEAVENLY_STEMS[monthStemIndex]),
-    elementBranch: getElement(EARTHLY_BRANCHES[monthBranchIndex]),
-  };
-
-  // 3. Day Pillar (Simplified epoch calculation)
-  // Accurate day pillar needs a reference date.
-  const dayOffset = Math.floor((date.getTime() - new Date(1900, 0, 31).getTime()) / (86400000));
-  const dayStemIndex = (dayOffset % 10 + 10) % 10;
-  const dayBranchIndex = (dayOffset % 12 + 12) % 12;
-
-  const dayPillar = {
-    stem: HEAVENLY_STEMS[dayStemIndex],
-    branch: EARTHLY_BRANCHES[dayBranchIndex],
-    zodiac: ZODIAC[dayBranchIndex],
-    elementStem: getElement(HEAVENLY_STEMS[dayStemIndex]),
-    elementBranch: getElement(EARTHLY_BRANCHES[dayBranchIndex]),
-  };
-
-  // 4. Hour Pillar
-  // Hour branch is fixed by time. Stem depends on Day stem.
-  let hourBranchIndex = 0;
-  if (hours >= 23 || hours < 1) hourBranchIndex = 0; // Zi
-  else if (hours < 3) hourBranchIndex = 1; // Chou
-  else hourBranchIndex = Math.floor((hours + 1) / 2);
-
-  const hourStemIndex = (dayStemIndex * 2 + hourBranchIndex) % 10;
-
-  const hourPillar = {
-    stem: HEAVENLY_STEMS[hourStemIndex],
-    branch: EARTHLY_BRANCHES[hourBranchIndex],
-    zodiac: ZODIAC[hourBranchIndex],
-    elementStem: getElement(HEAVENLY_STEMS[hourStemIndex]),
-    elementBranch: getElement(EARTHLY_BRANCHES[hourBranchIndex]),
-  };
+  // Format the scores for the frontend
+  const scores: FiveElementScore[] = Object.keys(counts).map((key) => {
+    const k = key as keyof typeof counts;
+    return {
+      name: k,
+      label: ELEMENT_CN_MAP[k],
+      score: counts[k],
+      color: ELEMENT_COLORS[k],
+    };
+  });
 
   return {
-    year: yearPillar,
-    month: monthPillar,
-    day: dayPillar,
-    hour: hourPillar
+    pillars: {
+      year: yearPillar,
+      month: monthPillar,
+      day: dayPillar,
+      hour: hourPillar,
+    },
+    scores,
   };
-}
+};
