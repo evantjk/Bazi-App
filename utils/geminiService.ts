@@ -1,8 +1,4 @@
-// 文件名: utils/geminiService.ts
 import { BaziChart } from "./baziLogic";
-
-// ⚠️ 注意：这里不需要 API Key 了，也不需要 GoogleGenerativeAI 库
-// 所有的 AI 逻辑都移到了 server.js 里
 
 export interface AIAnalysisResult {
   archetype: string;
@@ -15,10 +11,10 @@ export interface AIAnalysisResult {
 
 export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisResult> {
   try {
-    console.log("正在请求本地后端服务器 (localhost:3000)...");
+    console.log("正在请求后端 API (/api/analyze)...");
     
-    // 👇 这里是向你自己的 server.js 发送请求
-    const response = await fetch('http://localhost:3000/api/analyze', {
+    // 👇 修复点：直接用相对路径，Vite 代理会自动转发给 server.js
+    const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -27,25 +23,33 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
     });
 
     if (!response.ok) {
-      throw new Error(`服务器连接失败: ${response.statusText}`);
+      // 尝试读取后端返回的错误信息
+      const errorText = await response.text();
+      let errorMsg = response.statusText;
+      try {
+         const jsonError = JSON.parse(errorText);
+         if(jsonError.error) errorMsg = jsonError.error;
+      } catch(e) {}
+      
+      throw new Error(`请求失败 (${response.status}): ${errorMsg}`);
     }
 
     const data = await response.json();
     return data as AIAnalysisResult;
 
   } catch (error: any) {
-    console.error("前端请求失败:", error);
+    console.error("❌ 前端请求失败:", error);
     return mockAIResponse(chart, error.message || "无法连接到后端服务器");
   }
 }
 
 function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
   return {
-    archetype: "连接失败",
+    archetype: "连接中断",
     summary: `【错误详情】：${errorMsg}`,
-    strengthAnalysis: "请确保你已经打开了第二个终端并运行了 'node server.js'。",
-    bookAdvice: "无法连接后端。",
-    careerAdvice: "暂无数据。",
-    healthAdvice: "暂无数据。"
+    strengthAnalysis: "请检查：1. 后端终端是否运行着 'node server.js'？ 2. 前端终端是否重启了 'npm run dev'？",
+    bookAdvice: "无法连接。",
+    careerAdvice: "暂无。",
+    healthAdvice: "暂无。"
   };
 }
