@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, Sparkles, Zap, Scroll, Bot, Menu, ArrowRight, MapPin, Globe, Activity, BookOpen, User, Star, Award } from 'lucide-react';
+import { Calendar, Clock, Sparkles, Zap, Scroll, Bot, Menu, ArrowRight, MapPin, Globe, Activity, BookOpen, User, Star, Award, Languages } from 'lucide-react';
 import { FiveElementChart } from './components/FiveElementChart';
 import { calculateBazi, BaziChart, Pillar, ElementType } from './utils/baziLogic';
 import { analyzeBaziWithAI, AIAnalysisResult } from './utils/geminiService';
@@ -49,6 +49,7 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   
   const [activeTab, setActiveTab] = useState<'energy' | 'ancient' | 'career'>('energy');
+  const [isTranslated, setIsTranslated] = useState(false); // 控制翻译开关
 
   const handleAnalyze = async () => {
     setLoading(true);
@@ -56,6 +57,7 @@ export default function App() {
     setSidebarOpen(false); 
     setResult(null);
     setAiResult(null);
+    setIsTranslated(false); // 每次重新分析时重置翻译状态
 
     let chart: BaziChart;
     try {
@@ -120,6 +122,8 @@ export default function App() {
                     <div className="flex flex-wrap items-center gap-2 mb-3">
                         <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded uppercase">Gemini 2.5 Analysis</span>
                         <span className="text-slate-500 text-xs flex items-center gap-1"><MapPin size={12}/> {result.meta.trueSolarTime} 真太阳时</span>
+                        {/* 均时差提示 */}
+                        {result.meta.equationOfTime && <span className="text-slate-400 text-xs bg-slate-50 px-1 rounded border border-slate-100">均时差: {result.meta.equationOfTime}</span>}
                     </div>
                     {/* 命格赐名 */}
                     <h1 className="text-3xl lg:text-5xl font-bold text-slate-800 font-serif mb-2 tracking-tight">
@@ -163,7 +167,7 @@ export default function App() {
                         <FiveElementChart scores={result.fiveElementScore} />
                     </div>
                     
-                    {/* 历史人物对标 (新功能) */}
+                    {/* 历史人物对标 */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                         <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
                             <User size={16}/> 历史相似人物
@@ -225,14 +229,50 @@ export default function App() {
                                         </div>
                                     </div>
                                 )}
+                                
+                                {/* 穷通宝鉴 Tab (增加翻译功能) */}
                                 {activeTab === 'ancient' && (
                                     <div className="space-y-6 animate-fade-in-up">
                                         <div className="p-6 bg-amber-50 border border-amber-100 rounded-xl">
-                                            <h4 className="text-amber-900 font-bold mb-4 font-serif-sc text-lg border-b border-amber-200 pb-2">📜 调候用神</h4>
-                                            <p className="text-amber-800 text-base leading-8 font-serif-sc">{aiResult?.bookAdvice}</p>
+                                            {/* 标题栏 + 翻译按钮 */}
+                                            <div className="flex justify-between items-center mb-4 border-b border-amber-200 pb-2">
+                                                <h4 className="text-amber-900 font-bold font-serif-sc text-lg">📜 调候用神</h4>
+                                                
+                                                {/* 翻译按钮 */}
+                                                <button 
+                                                    onClick={() => setIsTranslated(!isTranslated)}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-semibold rounded-lg transition-colors border border-amber-200"
+                                                >
+                                                    <Languages size={14}/>
+                                                    {isTranslated ? "看原文" : "白话翻译"}
+                                                </button>
+                                            </div>
+                                            
+                                            {/* 内容显示：根据状态切换 */}
+                                            <div className="min-h-[100px]">
+                                                {isTranslated ? (
+                                                    <div className="animate-fade-in">
+                                                        <span className="text-xs font-bold text-amber-600 bg-amber-100 px-1 rounded mr-2">白话</span>
+                                                        <p className="text-amber-800 text-base leading-8 font-sans inline">
+                                                            {aiResult?.bookAdviceTranslation}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="animate-fade-in">
+                                                        <span className="text-xs font-bold text-amber-600 bg-amber-100 px-1 rounded mr-2">古文</span>
+                                                        <p className="text-amber-900 text-lg leading-8 font-serif-sc inline">
+                                                            {aiResult?.bookAdvice}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
+                                        <p className="text-xs text-slate-400 italic text-center">
+                                            * 此内容由 AI 模拟《穷通宝鉴》古籍逻辑生成
+                                        </p>
                                     </div>
                                 )}
+
                                 {activeTab === 'career' && (
                                     <div className="space-y-6 animate-fade-in-up">
                                          <div>

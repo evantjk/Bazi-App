@@ -8,7 +8,7 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ 您的最新 API Key
+// ✅ 您的 API Key
 const API_KEY = "AIzaSyCbumuVlE4jvsOD2PewUL5NcXW4IUIe1_M";
 
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -17,8 +17,15 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart } = req.body;
     
-    // 🚀 应您的要求，切换回 Gemini 2.5 Flash
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // 使用 Gemini 2.5 Flash
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0.1, // 保持稳定
+        topP: 0.8,
+        topK: 40,
+      }
+    });
 
     const prompt = `
       (角色：精通《穷通宝鉴》与《三命通会》的资深命理大师)
@@ -38,7 +45,7 @@ app.post('/api/analyze', async (req, res) => {
       
       2. "score": 命局评分（0-100分）。
          - 评分标准：基于五行流通、调候是否得宜、格局清纯度进行公平打分。
-         - 这是一个综合潜力分，参考古书对格局高低的判断。
+         - 重要：对于同一个八字，评分必须保持严格一致，不要随意波动。
 
       3. "summary": 30字以内的精辟断语，直击要害。
 
@@ -49,14 +56,16 @@ app.post('/api/analyze', async (req, res) => {
 
       5. "strengthAnalysis": 深度分析身强身弱及格局成败（100字左右）。
       
-      6. "bookAdvice": 模仿《穷通宝鉴》口吻的调候建议。
+      6. "bookAdvice": 模仿《穷通宝鉴》的文言文口吻，指出此八字的调候用神是什么，是否具备。（请用古文风格）
       
-      7. "careerAdvice": 事业建议。
+      7. "bookAdviceTranslation": 将上面的 "bookAdvice" 翻译成现代通俗易懂的白话文，解释其中的含义，方便现代人理解。
       
-      8. "healthAdvice": 健康建议。
+      8. "careerAdvice": 事业建议。
+      
+      9. "healthAdvice": 健康建议。
     `;
 
-    console.log("正在请求 AI (gemini-2.5-flash) 进行深度评分...");
+    console.log("正在请求 AI (gemini-2.5-flash) [含白话翻译]...");
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -74,5 +83,5 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`✅ 后端服务器已启动 (Gemini 2.5 Flash): http://localhost:${port}`);
+  console.log(`✅ 后端服务器已启动: http://localhost:${port}`);
 });

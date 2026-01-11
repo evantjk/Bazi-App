@@ -2,17 +2,18 @@ import { BaziChart } from "./baziLogic";
 
 export interface HistoricalFigure {
   name: string;
-  similarity: string; // 例如 "95%"
+  similarity: string;
   reason: string;
 }
 
 export interface AIAnalysisResult {
-  archetype: string;       // 命格赐名
-  score: number;           // AI 评分 (0-100)
+  archetype: string;
+  score: number;
   summary: string;
-  historicalFigures: HistoricalFigure[]; // 历史人物列表
+  historicalFigures: HistoricalFigure[];
   strengthAnalysis: string;
   bookAdvice: string;
+  bookAdviceTranslation: string; // ✅ 新增：白话文翻译
   careerAdvice: string;
   healthAdvice: string;
 }
@@ -57,6 +58,7 @@ function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
     historicalFigures: [],
     strengthAnalysis: "请检查后端服务是否启动。",
     bookAdvice: "无法连接。",
+    bookAdviceTranslation: "无法连接。",
     careerAdvice: "暂无。",
     healthAdvice: "暂无。"
   };
