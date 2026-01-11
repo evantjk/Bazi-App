@@ -2,7 +2,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { BaziChart } from "./baziLogic";
 
 // 👇👇👇 请直接把你的 API KEY 粘贴在下面这个引号里 👇👇👇
-// 例如：const API_KEY = "AIzaSyDxxxxxx...";
 const API_KEY = "AIzaSyB52Mg25XPxHfjZ1Q-PSN0VHJVz9ASrEvE"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -17,8 +16,8 @@ export interface AIAnalysisResult {
 }
 
 export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisResult> {
-  // 简单的检查：如果 Key 还是默认的提示语，或者为空，才显示模拟数据
-  if (!API_KEY || API_KEY === "AIzaSyB52Mg25XPxHfjZ1Q-PSN0VHJVz9ASrEvE" || API_KEY.includes("YOUR_GEMINI")) {
+  // ✅ 修复：只检查是否为空或包含默认提示语，不再拦截你的真实 Key
+  if (!API_KEY || API_KEY === "在这里粘贴你的GeminiKey" || API_KEY.includes("YOUR_GEMINI")) {
     console.warn("⚠️ API Key 未配置或无效，正在使用模拟数据");
     return mockAIResponse(chart);
   }
@@ -59,13 +58,12 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
     const response = await result.response;
     const text = response.text();
     
-    // 清理 Markdown 标记 (Gemini 有时会返回 ```json ... ```)
+    // 清理 Markdown 标记
     const jsonString = text.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(jsonString);
 
   } catch (error) {
     console.error("❌ AI 分析失败:", error);
-    // 如果 API 调用失败（比如配额用完或网络问题），回退到模拟数据，防止页面崩溃
     return mockAIResponse(chart);
   }
 }
