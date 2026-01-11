@@ -17,7 +17,7 @@ export interface AIAnalysisResult {
 
 export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisResult> {
   // ✅ 修复：只检查是否为空或包含默认提示语，不再拦截你的真实 Key
-  if (!API_KEY || API_KEY === "在这里粘贴你的GeminiKey" || API_KEY.includes("YOUR_GEMINI")) {
+  if (!API_KEY || API_KEY === "AIzaSyB52Mg25XPxHfjZ1Q-PSN0VHJVz9ASrEvE" || API_KEY.includes("YOUR_GEMINI")) {
     console.warn("⚠️ API Key 未配置或无效，正在使用模拟数据");
     return mockAIResponse(chart);
   }
