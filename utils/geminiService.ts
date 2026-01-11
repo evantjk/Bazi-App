@@ -1,8 +1,16 @@
 import { BaziChart } from "./baziLogic";
 
+export interface HistoricalFigure {
+  name: string;
+  similarity: string; // 例如 "95%"
+  reason: string;
+}
+
 export interface AIAnalysisResult {
-  archetype: string;
+  archetype: string;       // 命格赐名
+  score: number;           // AI 评分 (0-100)
   summary: string;
+  historicalFigures: HistoricalFigure[]; // 历史人物列表
   strengthAnalysis: string;
   bookAdvice: string;
   careerAdvice: string;
@@ -13,7 +21,6 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
   try {
     console.log("正在请求后端 API (/api/analyze)...");
     
-    // 👇 修复点：直接用相对路径，Vite 代理会自动转发给 server.js
     const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: {
@@ -23,7 +30,6 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
     });
 
     if (!response.ok) {
-      // 尝试读取后端返回的错误信息
       const errorText = await response.text();
       let errorMsg = response.statusText;
       try {
@@ -46,8 +52,10 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
 function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
   return {
     archetype: "连接中断",
+    score: 0,
     summary: `【错误详情】：${errorMsg}`,
-    strengthAnalysis: "请检查：1. 后端终端是否运行着 'node server.js'？ 2. 前端终端是否重启了 'npm run dev'？",
+    historicalFigures: [],
+    strengthAnalysis: "请检查后端服务是否启动。",
     bookAdvice: "无法连接。",
     careerAdvice: "暂无。",
     healthAdvice: "暂无。"
