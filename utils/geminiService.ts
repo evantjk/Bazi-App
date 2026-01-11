@@ -10,15 +10,17 @@ export interface AIAnalysisResult {
   archetype: string;
   score: number;
   summary: string;
+  appearanceAnalysis: string; // ✅ 新增：容貌分析
+  annualLuckAnalysis: string; // ✅ 新增：流年运势
   historicalFigures: HistoricalFigure[];
   strengthAnalysis: string;
   bookAdvice: string;
-  bookAdviceTranslation: string; // ✅ 新增：白话文翻译
+  bookAdviceTranslation: string;
   careerAdvice: string;
   healthAdvice: string;
 }
 
-export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisResult> {
+export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 2026): Promise<AIAnalysisResult> {
   try {
     console.log("正在请求后端 API (/api/analyze)...");
     
@@ -27,7 +29,8 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ chart }), 
+      // ✅ 传递 currentYear 参数
+      body: JSON.stringify({ chart, currentYear }), 
     });
 
     if (!response.ok) {
@@ -55,6 +58,8 @@ function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
     archetype: "连接中断",
     score: 0,
     summary: `【错误详情】：${errorMsg}`,
+    appearanceAnalysis: "无法连接服务器。",
+    annualLuckAnalysis: "无法连接服务器。",
     historicalFigures: [],
     strengthAnalysis: "请检查后端服务是否启动。",
     bookAdvice: "无法连接。",

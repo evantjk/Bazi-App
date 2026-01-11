@@ -3,6 +3,7 @@ import { Solar, Lunar } from 'lunar-typescript';
 // --- Types ---
 export type ElementType = 'wood' | 'fire' | 'earth' | 'gold' | 'water';
 export type Polarity = '+' | '-';
+export type Gender = 'male' | 'female'; // 新增性别类型
 
 export interface FiveElementScore {
   wood: number; fire: number; earth: number; gold: number; water: number;
@@ -27,17 +28,29 @@ export interface Pillar {
   kongWang: boolean;
 }
 
+// 新增：大运接口
+export interface DaYun {
+  startAge: number; // 起运年龄
+  endAge: number;
+  year: number;     // 起运年份
+  ganZhi: string;   // 干支 (如 "甲辰")
+  startYear: number;
+  endYear: number;
+}
+
 export interface BaziChart {
   meta: {
     solarDate: string;
-    trueSolarTime: string; // 最终显示的真太阳时
+    trueSolarTime: string;
     location: string;
-    equationOfTime: string; // 显示均时差修正值（如 +16.4m）
+    equationOfTime: string;
+    gender: string; // 记录性别
   };
   year: Pillar;
   month: Pillar;
   day: Pillar;
   hour: Pillar;
+  daYun: DaYun[]; // 大运列表
   fiveElementScore: FiveElementScore;
   destinyScore: number;
   dayMaster: string;
@@ -52,7 +65,6 @@ export const ELEMENT_CN_MAP: Record<ElementType, string> = {
   wood: '木', fire: '火', earth: '土', gold: '金', water: '水',
 };
 
-// 纳音表 (保持不变)
 const NA_YIN_MAP: Record<string, string> = {
   '甲子': '海中金', '乙丑': '海中金', '丙寅': '炉中火', '丁卯': '炉中火',
   '戊辰': '大林木', '己巳': '大林木', '庚午': '路旁土', '辛未': '路旁土',
@@ -94,85 +106,38 @@ const BRANCH_DETAILS: Record<string, { element: ElementType; zodiac: string; hid
   '亥': { element: 'water', zodiac: '猪', hidden: ['壬', '甲'] },
 };
 
-// --- 核心算法：解析 DMS 经度 ---
-// 支持输入: 103.5 或 103°45'34" 或 103 45 34
+// --- Helpers ---
 export function parseLongitude(input: string): number {
   const cleanInput = input.trim();
-  
-  if (!isNaN(Number(cleanInput))) {
-    return Number(cleanInput);
-  }
-
-  // Regex 匹配度分秒，支持 ° ' " 或 空格分隔
+  if (!isNaN(Number(cleanInput))) return Number(cleanInput);
   const dmsRegex = /^(\d+)[°\s]+(\d+)['\s]+(\d+(?:\.\d+)?)["\s]*$/;
   const match = cleanInput.match(dmsRegex);
-
   if (match) {
-    const deg = parseFloat(match[1]);
-    const min = parseFloat(match[2]);
-    const sec = parseFloat(match[3]);
-    return deg + (min / 60) + (sec / 3600);
+    return parseFloat(match[1]) + (parseFloat(match[2]) / 60) + (parseFloat(match[3]) / 3600);
   }
-
-  // 尝试匹配度分
-  const dmRegex = /^(\d+)[°\s]+(\d+(?:\.\d+)?)['\s]*$/;
-  const matchDM = cleanInput.match(dmRegex);
-  if (matchDM) {
-    const deg = parseFloat(matchDM[1]);
-    const min = parseFloat(matchDM[2]);
-    return deg + (min / 60);
-  }
-
   return 120; 
 }
 
-// --- 核心算法：计算真太阳时均时差 (Equation of Time) ---
-// 这就是您需要的“更精准”部分，计算地球公转导致的误差
 function getEquationOfTime(date: Date): number {
-  const dayOfYear = getDayOfYear(date);
-  
-  // B 计算公式，用于近似地球在轨道上的位置
-  // B = (N - 81) * 360 / 365
-  const B = (dayOfYear - 81) * 360 / 365 * (Math.PI / 180); // 转换为弧度
-  
-  // 均时差公式 (分钟)
-  // EoT = 9.87 * sin(2B) - 7.53 * cos(B) - 1.5 * sin(B)
-  // 11月初时，这项计算结果约为 +16.4 分钟
-  const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
-  
-  return eot;
+  const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000);
+  const B = (dayOfYear - 81) * 360 / 365 * (Math.PI / 180); 
+  return 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
 }
 
-function getDayOfYear(date: Date): number {
-  const start = new Date(date.getFullYear(), 0, 0);
-  const diff = date.getTime() - start.getTime();
-  const oneDay = 1000 * 60 * 60 * 24;
-  return Math.floor(diff / oneDay);
-}
+// --- Main Logic ---
 
-// --- Main Calculation Logic ---
-
-export function calculateBazi(inputDate: Date, longitudeStr: string): BaziChart {
+// 新增 gender 参数
+export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gender): BaziChart {
   
   const longitude = parseLongitude(longitudeStr);
-  const tzStandard = 120; // 假设使用北京时间/马来西亚时间标准 (UTC+8)
+  const tzStandard = 120; 
 
-  // 1. 经度时差 (Longitude Offset)
-  // 103.76 - 120 = -16.24度 -> -65 分钟
   const longOffsetMinutes = (longitude - tzStandard) * 4;
-
-  // 2. 真太阳时均时差 (Equation of Time)
-  // 11月5日 -> +16 分钟
   const eotMinutes = getEquationOfTime(inputDate);
-
-  // 3. 总修正量： 平太阳时 + 均时差
-  // -65 + 16 = -49 分钟
-  // 11:12 - 49m = 10:23
   const totalOffsetMinutes = longOffsetMinutes + eotMinutes;
 
   const trueSolarDate = new Date(inputDate.getTime() + totalOffsetMinutes * 60000);
 
-  // 使用 lunar-typescript 排盘
   const solar = Solar.fromYmdHms(
     trueSolarDate.getFullYear(),
     trueSolarDate.getMonth() + 1,
@@ -186,6 +151,27 @@ export function calculateBazi(inputDate: Date, longitudeStr: string): BaziChart 
   const eightChar = lunar.getEightChar();
   eightChar.setSect(2); 
 
+  // --- 大运计算 (New) ---
+  // lunar-typescript: 1=男, 0=女
+  const yun = eightChar.getYun(gender === 'male' ? 1 : 0);
+  const daYunArrNative = yun.getDaYun();
+  
+  // 转换大运数据格式
+  const daYunList: DaYun[] = [];
+  // 通常取 8 步大运
+  for (let i = 1; i <= 8; i++) {
+    const dy = daYunArrNative[i];
+    daYunList.push({
+      startAge: dy.getStartAge(),
+      endAge: dy.getEndAge(),
+      year: dy.getStartYear(),
+      startYear: dy.getStartYear(),
+      endYear: dy.getEndYear(),
+      ganZhi: dy.getGanZhi()
+    });
+  }
+
+  // --- 原局排盘 ---
   const yearGan = eightChar.getYearGan(); const yearZhi = eightChar.getYearZhi();
   const monthGan = eightChar.getMonthGan(); const monthZhi = eightChar.getMonthZhi();
   const dayGan = eightChar.getDayGan(); const dayZhi = eightChar.getDayZhi();
@@ -194,7 +180,6 @@ export function calculateBazi(inputDate: Date, longitudeStr: string): BaziChart 
   const dayMaster = dayGan;
   const dayMasterDetail = STEM_DETAILS[dayMaster];
   const monthBranchDetail = BRANCH_DETAILS[monthZhi];
-
   const seasonStatus = getSeasonStatus(dayMasterDetail.element, monthBranchDetail.element);
   const kongWangSet = getKongWang(dayGan, dayZhi);
 
@@ -207,15 +192,12 @@ export function calculateBazi(inputDate: Date, longitudeStr: string): BaziChart 
   const strengthResult = calculateStrengthAdvanced(scores, dayMasterDetail.element, seasonStatus, monthBranchDetail.element);
   const strongestEl = (Object.keys(scores) as ElementType[]).reduce((a, b) => scores[a] > scores[b] ? a : b);
 
-  // 简单的命运评分算法
   const scoreValues = Object.values(scores);
   const avg = scoreValues.reduce((a, b) => a + b, 0) / 5;
   const variance = scoreValues.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / 5;
   const destinyScore = Math.max(60, Math.min(99, Math.round(100 - Math.sqrt(variance))));
 
   const tstStr = `${trueSolarDate.getHours().toString().padStart(2, '0')}:${trueSolarDate.getMinutes().toString().padStart(2, '0')}`;
-  
-  // 格式化均时差显示 (例如 +16.4m)
   const eotDisplay = eotMinutes > 0 ? `+${eotMinutes.toFixed(1)}m` : `${eotMinutes.toFixed(1)}m`;
 
   return {
@@ -223,9 +205,11 @@ export function calculateBazi(inputDate: Date, longitudeStr: string): BaziChart 
         solarDate: inputDate.toISOString().split('T')[0],
         trueSolarTime: tstStr,
         location: longitudeStr,
-        equationOfTime: eotDisplay // 将此数据传回前端，您可以考虑显示它
+        equationOfTime: eotDisplay,
+        gender: gender === 'male' ? '男' : '女'
     },
     year: yearPillar, month: monthPillar, day: dayPillar, hour: hourPillar,
+    daYun: daYunList, // ✅ 返回大运数据
     fiveElementScore: scores, destinyScore,
     dayMaster, dayMasterElement: dayMasterDetail.element,
     strength: strengthResult.desc,
@@ -234,17 +218,13 @@ export function calculateBazi(inputDate: Date, longitudeStr: string): BaziChart 
   };
 }
 
-// --- Helper Functions (保持不变) ---
-
+// --- Helper Functions --- (同前)
 function createPillar(stem: string, branch: string, dayMaster: string, kw: string[], yZhi: string, dZhi: string, mZhi: string): Pillar {
   const sDetail = STEM_DETAILS[stem];
   const bDetail = BRANCH_DETAILS[branch];
   const naYin = NA_YIN_MAP[stem + branch] || '';
   const dmDetail = STEM_DETAILS[dayMaster];
-
-  // 传递所有支参数以计算神煞
   const shenShaList = getShenSha(stem, branch, dayMaster, dZhi, yZhi, mZhi);
-
   return {
     stem, branch, zodiac: bDetail.zodiac,
     elementStem: sDetail.element,
@@ -255,39 +235,22 @@ function createPillar(stem: string, branch: string, dayMaster: string, kw: strin
       main: calculateTenGod(dmDetail, STEM_DETAILS[bDetail.hidden[0]]),
       hidden: bDetail.hidden.slice(1).map(h => calculateTenGod(dmDetail, STEM_DETAILS[h]))
     },
-    naYin,
-    shenSha: shenShaList,
-    kongWang: kw.includes(branch)
+    naYin, shenSha: shenShaList, kongWang: kw.includes(branch)
   };
 }
 
-// 完整神煞系统 (保持您的原要求)
 function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: string, yearBranch: string, monthBranch: string): string[] {
     const list: string[] = [];
     const tianYiMap: Record<string, string[]> = {
-        '甲': ['丑', '未'], '戊': ['丑', '未'], '庚': ['丑', '未'],
-        '乙': ['子', '申'], '己': ['子', '申'], '丙': ['亥', '酉'], 
-        '丁': ['亥', '酉'], '壬': ['巳', '卯'], '癸': ['巳', '卯'], '辛': ['午', '寅']
+        '甲': ['丑', '未'], '戊': ['丑', '未'], '庚': ['丑', '未'], '乙': ['子', '申'], '己': ['子', '申'], '丙': ['亥', '酉'], '丁': ['亥', '酉'], '壬': ['巳', '卯'], '癸': ['巳', '卯'], '辛': ['午', '寅']
     };
     if (tianYiMap[dayStem]?.includes(branch)) list.push('天乙贵人');
-
-    const wenChangMap: Record<string, string> = {
-        '甲': '巳', '乙': '午', '丙': '申', '戊': '申',
-        '丁': '酉', '己': '酉', '庚': '亥', '辛': '子', '壬': '寅', '癸': '卯'
-    };
+    const wenChangMap: Record<string, string> = { '甲': '巳', '乙': '午', '丙': '申', '戊': '申', '丁': '酉', '己': '酉', '庚': '亥', '辛': '子', '壬': '寅', '癸': '卯' };
     if (wenChangMap[dayStem] === branch) list.push('文昌贵人');
-
-    const yangRenMap: Record<string, string> = {
-        '甲': '卯', '丙': '午', '戊': '午', '庚': '酉', '壬': '子'
-    };
+    const yangRenMap: Record<string, string> = { '甲': '卯', '丙': '午', '戊': '午', '庚': '酉', '壬': '子' };
     if (yangRenMap[dayStem] === branch) list.push('羊刃');
-
-    const luMap: Record<string, string> = {
-        '甲': '寅', '乙': '卯', '丙': '巳', '丁': '午', '戊': '巳', '己': '午',
-        '庚': '申', '辛': '酉', '壬': '亥', '癸': '子'
-    };
+    const luMap: Record<string, string> = { '甲': '寅', '乙': '卯', '丙': '巳', '丁': '午', '戊': '巳', '己': '午', '庚': '申', '辛': '酉', '壬': '亥', '癸': '子' };
     if (luMap[dayStem] === branch) list.push('禄神');
-
     const isYiMa = (z: string) => {
         if ('申子辰'.includes(z) && branch === '寅') return true;
         if ('寅午戌'.includes(z) && branch === '申') return true;
@@ -296,7 +259,6 @@ function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: st
         return false;
     };
     if (isYiMa(yearBranch) || isYiMa(dayBranch)) list.push('驿马');
-
     const isTaoHua = (z: string) => {
         if ('申子辰'.includes(z) && branch === '酉') return true;
         if ('寅午戌'.includes(z) && branch === '卯') return true;
@@ -305,7 +267,6 @@ function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: st
         return false;
     };
     if (isTaoHua(yearBranch) || isTaoHua(dayBranch)) list.push('桃花');
-
     const isHuaGai = (z: string) => {
         if ('申子辰'.includes(z) && branch === '辰') return true;
         if ('寅午戌'.includes(z) && branch === '戌') return true;
@@ -314,11 +275,9 @@ function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: st
         return false;
     };
     if (isHuaGai(yearBranch) || isHuaGai(dayBranch)) list.push('华盖');
-
     if (stem && branch) {
         if (['戊戌', '庚辰', '庚戌', '壬辰'].includes(stem + branch) && dayStem === stem && dayBranch === branch) list.push('魁罡');
     }
-
     const isJiangXing = (z: string) => {
         if ('申子辰'.includes(z) && branch === '子') return true;
         if ('寅午戌'.includes(z) && branch === '午') return true;
@@ -327,13 +286,8 @@ function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: st
         return false;
     };
     if (isJiangXing(yearBranch) || isJiangXing(dayBranch)) list.push('将星');
-    
-    const jinYuMap: Record<string, string> = {
-        '甲': '辰', '乙': '巳', '丙': '未', '丁': '申', '戊': '未', 
-        '己': '申', '庚': '戌', '辛': '亥', '壬': '丑', '癸': '寅'
-    };
+    const jinYuMap: Record<string, string> = { '甲': '辰', '乙': '巳', '丙': '未', '丁': '申', '戊': '未', '己': '申', '庚': '戌', '辛': '亥', '壬': '丑', '癸': '寅' };
     if (jinYuMap[dayStem] === branch) list.push('金舆');
-
     return list;
 }
 
@@ -343,7 +297,6 @@ function getKongWang(dStem: string, dBranch: string): string[] {
     const sIdx = stems.indexOf(dStem);
     const bIdx = branches.indexOf(dBranch);
     const diff = bIdx - sIdx;
-    
     if (diff === 2 || diff === -10) return ['戌', '亥']; 
     if (diff === 4 || diff === -8) return ['申', '酉']; 
     if (diff === 6 || diff === -6) return ['午', '未']; 
@@ -383,7 +336,6 @@ function calculateStrengthAdvanced(scores: FiveElementScore, dmEl: ElementType, 
     const selfEnergy = scores[dmEl] + scores[resourceEl];
     const totalEnergy = Object.values(scores).reduce((a,b) => a+b, 0);
     const percentage = selfEnergy / totalEnergy;
-
     let strength = '身弱';
     if (isDeLing && percentage > 0.4) strength = '身强'; 
     else if (!isDeLing && percentage > 0.55) strength = '身强'; 
