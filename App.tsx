@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Sparkles, Zap, Scroll, Bot, Menu, X, ArrowRight } from 'lucide-react';
 import { FiveElementChart } from './components/FiveElementChart';
-import { calculateBazi, BaziChart, Pillar } from './utils/baziLogic';
+import { calculateBazi, BaziChart, Pillar, ELEMENT_CN_MAP } from './utils/baziLogic';
 
 const PillarCard = ({ title, pillar }: { title: string; pillar?: Pillar }) => {
   const getElementColor = (type: string | undefined) => {
@@ -54,13 +54,18 @@ export default function App() {
     setLoading(true);
     setSidebarOpen(false); // Close sidebar on mobile
     
-    // Simulate calculation delay for effect
+    // Simulate calculation delay for effect (UI UX)
     setTimeout(() => {
-        const inputDate = new Date(`${date}T${time}`);
-        const chart = calculateBazi(inputDate);
-        setResult(chart);
+        try {
+            const inputDate = new Date(`${date}T${time}`);
+            const chart = calculateBazi(inputDate);
+            setResult(chart);
+        } catch (error) {
+            console.error("Analysis Failed:", error);
+            alert("日期格式有误或排盘失败，请重试。");
+        }
         setLoading(false);
-    }, 800);
+    }, 600);
   };
 
   return (
@@ -151,7 +156,7 @@ export default function App() {
         {loading && (
              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50 backdrop-blur-sm z-10">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-                <p className="text-indigo-600 font-medium animate-pulse">正在解析天干地支...</p>
+                <p className="text-indigo-600 font-medium animate-pulse">正在精密计算真太阳时与节气...</p>
              </div>
         )}
 
@@ -162,20 +167,30 @@ export default function App() {
             <div className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
-                        <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded uppercase">AI 分析结果</span>
+                        <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded uppercase">AI Beta 版</span>
                         <span className="text-slate-400 text-xs">{date} {time}</span>
                     </div>
                     <h1 className="text-3xl lg:text-4xl font-bold text-slate-800 font-serif-sc mb-1">
-                        🦁 称号：破局的创新者
+                        {result.archetype}
                     </h1>
-                    <p className="text-slate-500">命带魁罡，刚毅果决，适合开创性事业。</p>
+                    <p className="text-slate-500">
+                        日主 <strong>{result.dayMaster}</strong> ({ELEMENT_CN_MAP[result.dayMasterElement]}) 
+                        <span className="mx-2 text-slate-300">|</span> 
+                        格局判断：{result.strength}
+                    </p>
                 </div>
                 <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <div className="text-right">
-                        <div className="text-xs font-semibold text-slate-400 uppercase">综合评分</div>
-                        <div className="text-4xl font-bold text-indigo-600">88<span className="text-lg text-slate-400 font-normal">分</span></div>
+                        <div className="text-xs font-semibold text-slate-400 uppercase">命局平衡分</div>
+                        <div className="text-4xl font-bold text-indigo-600">
+                            {result.destinyScore}
+                            <span className="text-lg text-slate-400 font-normal">分</span>
+                        </div>
                     </div>
-                    <div className="h-12 w-12 rounded-full border-4 border-indigo-100 border-t-indigo-600 transform -rotate-45"></div>
+                    {/* Visual Ring for Score - Dynamic Color based on score */}
+                    <div className={`h-12 w-12 rounded-full border-4 border-t-transparent transform -rotate-45
+                        ${result.destinyScore > 80 ? 'border-emerald-500' : result.destinyScore > 60 ? 'border-indigo-500' : 'border-amber-500'}
+                    `}></div>
                 </div>
             </div>
 
@@ -197,12 +212,14 @@ export default function App() {
                         五行能量分布
                     </h3>
                     <div className="flex-1 flex items-center justify-center">
-                        <FiveElementChart />
+                        <FiveElementChart scores={result.fiveElementScore} />
                     </div>
                     <div className="mt-4 text-center">
                         <p className="text-sm text-slate-500">
-                            <span className="font-bold text-emerald-600">木</span> 气最旺，
-                            <span className="font-bold text-blue-600">水</span> 气偏弱。
+                            能量最强为 <span className="font-bold text-indigo-600">{ELEMENT_CN_MAP[result.strongestElement]}</span>，
+                            日主能量 <span className={`font-bold ${result.strength === '身强' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                {result.strength}
+                            </span>。
                         </p>
                     </div>
                 </div>
@@ -241,17 +258,18 @@ export default function App() {
                             <div className="space-y-4 animate-fade-in-up">
                                 <h4 className="text-lg font-bold text-slate-800">五行强弱分析</h4>
                                 <p className="text-slate-600 leading-relaxed">
-                                    此命局日元为<span className="font-bold text-emerald-600">甲木</span>，生于寅月，得令而旺。
-                                    天干透出比肩，地支有根。整体能量场偏强，具有极强的生命力和向上生长的欲望。
+                                    您的日主为<span className="font-bold text-indigo-600">{result.dayMaster}（{ELEMENT_CN_MAP[result.dayMasterElement]}）</span>。
+                                    根据排盘结果，您的命局被判定为
+                                    <span className="font-bold bg-slate-100 px-1 mx-1 rounded">{result.strength}</span>。
                                 </p>
                                 <p className="text-slate-600 leading-relaxed">
-                                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
-                                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+                                    命局中 <span className="font-bold">{ELEMENT_CN_MAP[result.strongestElement]}</span> 能量最为突出，这通常代表了您的显性性格特质或社会行为模式。
+                                    {result.destinyScore > 80 ? '五行流通较为顺畅，一生波折较少。' : '五行分布有一定偏颇，需要后天补救以达到平衡。'}
                                 </p>
                                 <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 mt-4">
-                                    <h5 className="font-semibold text-slate-700 mb-2">喜用神建议</h5>
-                                    <p className="text-sm text-slate-500">
-                                        建议以<span className="font-bold text-red-500">火</span>（食伤）泄秀，或以<span className="font-bold text-yellow-600">金</span>（官杀）修剪枝叶。
+                                    <h5 className="font-semibold text-slate-700 mb-2">⚖️ 用神建议</h5>
+                                    <p className="text-sm text-slate-600 leading-relaxed">
+                                        {result.favorable}
                                     </p>
                                 </div>
                             </div>
@@ -259,17 +277,21 @@ export default function App() {
 
                         {activeTab === 'ancient' && (
                             <div className="space-y-4 animate-fade-in-up">
-                                <h4 className="text-lg font-bold text-slate-800 font-serif-sc">《三命通会》摘录</h4>
+                                <h4 className="text-lg font-bold text-slate-800 font-serif-sc">日主论命</h4>
                                 <blockquote className="pl-4 border-l-4 border-indigo-200 italic text-slate-600 bg-slate-50 py-2 pr-2 rounded-r">
-                                    "甲木参天，脱胎要火。春不容金，秋不容土。火炽乘龙，水荡骑虎。地润天和，植立千古。"
+                                    {result.dayMaster === '甲' && "甲木参天，脱胎要火。春不容金，秋不容土。"}
+                                    {result.dayMaster === '乙' && "乙木虽柔，刲羊解牛。怀丁抱丙，跨凤乘猴。"}
+                                    {result.dayMaster === '丙' && "丙火猛烈，欺霜侮雪。能煅庚金，逢辛反怯。"}
+                                    {result.dayMaster === '丁' && "丁火柔中，内性昭融。抱乙而孝，合壬而忠。"}
+                                    {result.dayMaster === '戊' && "戊土固重，既中且正。静翕动辟，万物司命。"}
+                                    {result.dayMaster === '己' && "己土卑湿，中正蓄藏。不愁木盛，不畏水狂。"}
+                                    {result.dayMaster === '庚' && "庚金带煞，刚健为最。得水而清，得火而锐。"}
+                                    {result.dayMaster === '辛' && "辛金软弱，温润而清。畏土之叠，乐水之盈。"}
+                                    {result.dayMaster === '壬' && "壬水通河，能泄金气。刚中之德，周流不滞。"}
+                                    {result.dayMaster === '癸' && "癸水至弱，达于天津。得龙而运，功化斯神。"}
                                 </blockquote>
                                 <p className="text-slate-600 leading-relaxed mt-4">
-                                    此段古文说明了甲木的性质。Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
-                                    Excepteur sint occaecat cupidatat non proident.
-                                </p>
-                                <h4 className="text-lg font-bold text-slate-800 font-serif-sc mt-6">《穷通宝鉴》调候</h4>
-                                <p className="text-slate-600 leading-relaxed">
-                                    寅月甲木，初春尚寒，先用丙火温暖，次用癸水滋润。
+                                    （以上摘自《滴天髓》总论，描述了日主的基本心性与喜忌。）
                                 </p>
                             </div>
                         )}
@@ -281,14 +303,25 @@ export default function App() {
                                         <Bot size={20} />
                                     </div>
                                     <div>
-                                        <h4 className="text-lg font-bold text-slate-800">现代职业发展建议</h4>
+                                        <h4 className="text-lg font-bold text-slate-800">Beta 版智能建议</h4>
                                         <p className="text-slate-600 leading-relaxed mt-2">
-                                            基于您的五行结构，您具备很强的独立思考能力和领导潜质。适合从事需要开创性、规划性和仁慈之心的行业。
+                                            基于 <strong className="text-indigo-600">{result.strength}</strong> 的格局，结合最强的 <strong className="text-indigo-600">{ELEMENT_CN_MAP[result.strongestElement]}</strong> 能量：
                                         </p>
                                         <ul className="mt-4 space-y-2 text-slate-600 list-disc list-inside">
-                                            <li><strong className="text-slate-800">推荐行业：</strong> 教育培训、园林设计、木材家具、文化出版。</li>
-                                            <li><strong className="text-slate-800">职场风格：</strong> 直率坦诚，不喜欢拐弯抹角，容易成为团队的精神领袖。</li>
-                                            <li><strong className="text-slate-800">注意事项：</strong> 容易固执己见，建议多听取他人意见，保持柔韧性。</li>
+                                            {result.strength === '身弱' ? (
+                                                <>
+                                                    <li><strong className="text-slate-800">自我提升：</strong> 你需要更多的自信和支持。建议多学习、深造，通过知识（印星）来武装自己。</li>
+                                                    <li><strong className="text-slate-800">社交策略：</strong> 寻找志同道合的伙伴（比劫）合作，避免单打独斗。</li>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <li><strong className="text-slate-800">事业突破：</strong> 你精力充沛，适合通过输出才华（食伤）或追求实际成果（财官）来消耗过剩的精力。</li>
+                                                    <li><strong className="text-slate-800">行事风格：</strong> 建议学会收敛锋芒，多倾听他人意见，避免过于强势。</li>
+                                                </>
+                                            )}
+                                            <li className="mt-2 text-sm text-slate-500 bg-slate-50 p-2 rounded">
+                                                💡 提示：详细的职业与运势分析功能将在 Beta 2.0 版本中上线。
+                                            </li>
                                         </ul>
                                     </div>
                                 </div>
