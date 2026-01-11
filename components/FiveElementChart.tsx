@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,QlResponsiveContainer, ResponsiveContainer } from 'recharts';
 import { FiveElementScore, ELEMENT_CN_MAP } from '../utils/baziLogic';
 
 interface Props {
@@ -7,8 +7,7 @@ interface Props {
 }
 
 export const FiveElementChart: React.FC<Props> = ({ scores }) => {
-  // 转换数据格式以适配 Recharts
-  // 顺序建议按五行相生顺序：木 -> 火 -> 土 -> 金 -> 水
+  // Convert data for Recharts
   const data = [
     { subject: `木 (${ELEMENT_CN_MAP.wood})`, value: scores.wood, fullMark: 100 },
     { subject: `火 (${ELEMENT_CN_MAP.fire})`, value: scores.fire, fullMark: 100 },
@@ -17,7 +16,7 @@ export const FiveElementChart: React.FC<Props> = ({ scores }) => {
     { subject: `水 (${ELEMENT_CN_MAP.water})`, value: scores.water, fullMark: 100 },
   ];
 
-  // Find max value to set domain dynamic or fixed
+  // Dynamic domain max
   const maxVal = Math.max(...Object.values(scores), 10);
 
   return (
@@ -29,7 +28,6 @@ export const FiveElementChart: React.FC<Props> = ({ scores }) => {
             dataKey="subject" 
             tick={{ fill: '#475569', fontSize: 12, fontWeight: 600 }} 
           />
-<<<<<<< HEAD
           <PolarRadiusAxis 
             angle={30} 
             domain={[0, maxVal + 10]} 

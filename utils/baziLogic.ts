@@ -1,31 +1,43 @@
 import { Solar, Lunar } from 'lunar-typescript';
 
+// --- Types ---
+
 export type ElementType = 'wood' | 'fire' | 'earth' | 'gold' | 'water';
 
-export const ELEMENTS: ElementType[] = ['wood', 'fire', 'earth', 'gold', 'water'];
-
-// --- 1. Type Definitions ---
-
 export interface FiveElementScore {
-  name: string;  // e.g., 'wood'
-  label: string; // e.g., '木'
-  score: number; // The count or percentage
-  color: string; // Hex code for UI
+  wood: number;
+  fire: number;
+  earth: number;
+  gold: number;
+  water: number;
 }
 
-export interface BaziResult {
-  pillars: {
-    year: string;
-    month: string;
-    day: string;
-    hour: string;
-  };
-  scores: FiveElementScore[];
+export interface Pillar {
+  stem: string;
+  branch: string;
+  zodiac: string;
+  elementStem: ElementType;
+  elementBranch: ElementType;
 }
 
-// --- 2. Constants & Maps ---
+export interface BaziChart {
+  year: Pillar;
+  month: Pillar;
+  day: Pillar;
+  hour: Pillar;
+  fiveElementScore: FiveElementScore;
+  destinyScore: number; 
+  archetype: string;
+  dayMaster: string;
+  dayMasterElement: ElementType;
+  strength: string;
+  strongestElement: ElementType;
+  favorable: string;
+}
 
-// Maps internal English keys to Chinese display characters (This was missing previously)
+// --- Constants & Maps ---
+
+// EXPORTED MAP (This was missing in the advanced version but needed by App.tsx)
 export const ELEMENT_CN_MAP: Record<ElementType, string> = {
   wood: '木',
   fire: '火',
@@ -34,102 +46,14 @@ export const ELEMENT_CN_MAP: Record<ElementType, string> = {
   water: '水',
 };
 
-// Maps specific Chinese Stems/Branches to their Element
-// Note: 'gold' is used here instead of 'metal' to match your existing code conventions
-export const ELEMENT_MAP: Record<string, 'gold' | 'wood' | 'water' | 'fire' | 'earth'> = {
-  // Heavenly Stems (天干)
-  甲: 'wood', 乙: 'wood',
-  丙: 'fire', 丁: 'fire',
-  戊: 'earth', 己: 'earth',
-  庚: 'gold', 辛: 'gold',
-  壬: 'water', 癸: 'water',
-
-  // Earthly Branches (地支) - Based on main Qi
-  寅: 'wood', 卯: 'wood',
-  巳: 'fire', 午: 'fire',
-  辰: 'earth', 戌: 'earth', 丑: 'earth', 未: 'earth',
-  申: 'gold', 酉: 'gold',
-  亥: 'water', 子: 'water',
-};
-
 export const ELEMENT_COLORS: Record<string, string> = {
-  wood: '#4ade80', // Green
-  fire: '#f87171', // Red
-  earth: '#fbbf24', // Yellow/Brown
-  gold: '#9ca3af', // Grey/Silver
-  water: '#60a5fa', // Blue
+  wood: '#4ade80',
+  fire: '#f87171',
+  earth: '#fbbf24',
+  gold: '#9ca3af',
+  water: '#60a5fa',
 };
 
-// --- 3. Main Calculation Logic ---
-
-export const calculateBazi = (dateStr: string, timeStr: string): BaziResult => {
-  // Parse input (assumes YYYY-MM-DD and HH:mm)
-  const dateParts = dateStr.split('-').map(Number);
-  const timeParts = timeStr.split(':').map(Number);
-
-  // Create Solar object from input
-  const solar = Solar.fromYmdHms(
-    dateParts[0],
-    dateParts[1],
-    dateParts[2],
-    timeParts[0],
-    timeParts[1],
-    0
-  );
-
-  // Convert to Lunar to get BaZi characters
-  const lunar = solar.getLunar();
-
-  // Get the Four Pillars (GanZhi)
-  const yearPillar = lunar.getYearInGanZhi();
-  const monthPillar = lunar.getMonthInGanZhi();
-  const dayPillar = lunar.getDayInGanZhi();
-  const hourPillar = lunar.getTimeInGanZhi();
-
-  // Aggregate all 8 characters
-  const allChars = [
-    ...yearPillar.split(''),
-    ...monthPillar.split(''),
-    ...dayPillar.split(''),
-    ...hourPillar.split('')
-  ];
-
-  // Calculate Element Counts
-  const counts = { wood: 0, fire: 0, earth: 0, gold: 0, water: 0 };
-  
-  allChars.forEach((char) => {
-    const element = ELEMENT_MAP[char];
-    if (element) {
-      counts[element]++;
-    }
-  });
-
-  // Format the scores for the frontend
-  const scores: FiveElementScore[] = Object.keys(counts).map((key) => {
-    const k = key as keyof typeof counts;
-    return {
-      name: k,
-      label: ELEMENT_CN_MAP[k],
-      score: counts[k],
-      color: ELEMENT_COLORS[k],
-    };
-  });
-
-  return {
-    pillars: {
-      year: yearPillar,
-      month: monthPillar,
-      day: dayPillar,
-      hour: hourPillar,
-    },
-    scores,
-  };
-};
-=======
-  water: '水'
-};
-
-// Mapping Characters to Elements
 const CHAR_ELEMENT_MAP: Record<string, ElementType> = {
   '甲': 'wood', '乙': 'wood', '寅': 'wood', '卯': 'wood',
   '丙': 'fire', '丁': 'fire', '巳': 'fire', '午': 'fire',
@@ -138,15 +62,12 @@ const CHAR_ELEMENT_MAP: Record<string, ElementType> = {
   '壬': 'water', '癸': 'water', '亥': 'water', '子': 'water'
 };
 
-// Zodiac Mapping
 const ZODIAC_MAP: Record<string, string> = {
   '子': '鼠', '丑': '牛', '寅': '虎', '卯': '兔', '辰': '龙', '巳': '蛇',
   '午': '马', '未': '羊', '申': '猴', '酉': '鸡', '戌': '狗', '亥': '猪'
 };
 
-// Hidden Stems (Zhi Cang Gan) for Scoring
-// Structure: [Main Qi (5pts), Middle Qi (3pts), Residual Qi (2pts)]
-// Note: Some branches only have 1 or 2 hidden stems.
+// Hidden Stems (Main Qi 5, Middle 3, Residual 2)
 const HIDDEN_STEMS: Record<string, string[]> = {
   '子': ['癸'],
   '丑': ['己', '癸', '辛'],
@@ -162,42 +83,10 @@ const HIDDEN_STEMS: Record<string, string[]> = {
   '亥': ['壬', '甲']
 };
 
-export interface Pillar {
-  stem: string;
-  branch: string;
-  zodiac: string;
-  elementStem: ElementType;
-  elementBranch: ElementType;
-}
+// --- Main Logic ---
 
-export interface FiveElementScore {
-  wood: number;
-  fire: number;
-  earth: number;
-  gold: number;
-  water: number;
-}
-
-export interface BaziChart {
-  year: Pillar;
-  month: Pillar;
-  day: Pillar;
-  hour: Pillar;
-  fiveElementScore: FiveElementScore;
-  destinyScore: number; // 0-100 Balance Score
-  archetype: string;    // Title
-  dayMaster: string;    // Day Stem Character
-  dayMasterElement: ElementType;
-  strength: string;     // 'Weak' | 'Strong'
-  strongestElement: ElementType;
-  favorable: string;    // Simple advice on favorable elements
-}
-
-/**
- * Main Calculation Function
- */
 export function calculateBazi(date: Date): BaziChart {
-  // 1. Convert to Solar -> Lunar -> EightChar
+  // 1. Convert to Lunar/EightChar
   const solar = Solar.fromYmdHms(
     date.getFullYear(),
     date.getMonth() + 1,
@@ -209,9 +98,7 @@ export function calculateBazi(date: Date): BaziChart {
   
   const lunar = solar.getLunar();
   const eightChar = lunar.getEightChar();
-  
-  // Set Sect to 2 (Year starts at Li Chun - Traditional Bazi Standard)
-  eightChar.setSect(2);
+  eightChar.setSect(2); // Traditional Bazi start at Li Chun
 
   // 2. Extract Pillars
   const yearPillar = createPillar(eightChar.getYearGan(), eightChar.getYearZhi());
@@ -222,37 +109,32 @@ export function calculateBazi(date: Date): BaziChart {
   const dayMaster = dayPillar.stem;
   const dayMasterElement = dayPillar.elementStem;
 
-  // 3. Evaluate Five Elements Score
+  // 3. Calculate Scores
   const scores = evaluateFiveElements(yearPillar, monthPillar, dayPillar, hourPillar);
 
-  // 4. Calculate Balance Score (Destiny Score)
+  // 4. Calculate Destiny Score (Balance)
   const scoreValues = Object.values(scores);
   const avg = scoreValues.reduce((a, b) => a + b, 0) / 5;
   const variance = scoreValues.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / 5;
   const stdDev = Math.sqrt(variance);
-  // A lower standard deviation means more balanced. 
-  // Map stdDev roughly 0-40 to a score of 100-60.
   let destinyScore = Math.max(60, Math.round(100 - stdDev));
-  if (destinyScore > 98) destinyScore = 98; // Cap purely for realistic feel
+  if (destinyScore > 98) destinyScore = 98;
 
-  // 5. Determine Strength (Simplified Concept)
-  // Compare Day Master Element + Support (Resource) vs Drain (Output, Wealth, Officer)
-  // Resource Generates Self.
+  // 5. Determine Strength
   const resourceElement = getGeneratingElement(dayMasterElement);
   const selfScore = scores[dayMasterElement];
-  const resourceScore = scores[resourceElement];
+  constQbResourceScore = scores[resourceElement];
   const totalSystemScore = Object.values(scores).reduce((a, b) => a + b, 0);
   
-  const selfStrengthVal = selfScore + resourceScore;
-  const isStrong = selfStrengthVal > (totalSystemScore * 0.45); // Threshold approximation
+  const selfStrengthVal = selfScore + constQbResourceScore;
+  const isStrong = selfStrengthVal > (totalSystemScore * 0.45);
   const strength = isStrong ? '身强' : '身弱';
 
   // 6. Determine Archetype
   const strongestElement = (Object.keys(scores) as ElementType[]).reduce((a, b) => scores[a] > scores[b] ? a : b);
   const archetype = getArchetype(dayMasterElement, strongestElement, isStrong);
 
-  // 7. Favorable Advice
-  // Simple Logic: Weak likes Resource/Self. Strong likes Output/Wealth/Officer.
+  // 7. Advice
   let favorable = "";
   if (isStrong) {
       favorable = `喜用神为【食伤、财星、官杀】，即 ${getElementColorName(getOutputElement(dayMasterElement))}、${getElementColorName(getControlledElement(dayMasterElement))}、${getElementColorName(getControllingElement(dayMasterElement))}。建议多去户外，或者从事具有挑战性的工作。`;
@@ -276,9 +158,8 @@ export function calculateBazi(date: Date): BaziChart {
   };
 }
 
-/**
- * Helper: Create Pillar Object
- */
+// --- Helpers ---
+
 function createPillar(stem: string, branch: string): Pillar {
   return {
     stem,
@@ -289,91 +170,41 @@ function createPillar(stem: string, branch: string): Pillar {
   };
 }
 
-/**
- * Core Algorithm: Evaluate Five Elements
- */
 function evaluateFiveElements(y: Pillar, m: Pillar, d: Pillar, h: Pillar): FiveElementScore {
   const scores: FiveElementScore = { wood: 0, fire: 0, earth: 0, gold: 0, water: 0 };
   const pillars = [y, m, d, h];
 
-  // 1. Iterate Pillars
   pillars.forEach((p, index) => {
-    const isMonthPillar = index === 1; // Month pillar index
-    const multiplier = isMonthPillar ? 1.5 : 1.0; // Month Branch has 1.5x weight
+    const isMonthPillar = index === 1; 
+    const multiplier = isMonthPillar ? 1.5 : 1.0; 
 
-    // A. Heavenly Stem Score (+5)
-    scores[p.elementStem] += 5; // Standard weight for stem
+    // Stem (+5)
+    scores[p.elementStem] += 5; 
 
-    // B. Earthly Branch Hidden Stems Score
+    // Hidden Stems
     const hidden = HIDDEN_STEMS[p.branch] || [];
-    
-    // Logic: Main Qi = 5, Middle Qi = 3, Residual Qi = 2
-    // If array has 1 item: Main
-    // If array has 2 items: Main, Middle (Treat 2nd as Middle approx)
-    // If array has 3 items: Main, Middle, Residual
-    
-    if (hidden.length > 0) {
-      const mainElement = CHAR_ELEMENT_MAP[hidden[0]];
-      scores[mainElement] += (5 * multiplier);
-    }
-    if (hidden.length > 1) {
-      const midElement = CHAR_ELEMENT_MAP[hidden[1]];
-      scores[midElement] += (3 * multiplier);
-    }
-    if (hidden.length > 2) {
-      const resElement = CHAR_ELEMENT_MAP[hidden[2]];
-      scores[resElement] += (2 * multiplier);
-    }
+    if (hidden.length > 0) scores[CHAR_ELEMENT_MAP[hidden[0]]] += (5 * multiplier);
+    if (hidden.length > 1) scores[CHAR_ELEMENT_MAP[hidden[1]]] += (3 * multiplier);
+    if (hidden.length > 2) scores[CHAR_ELEMENT_MAP[hidden[2]]] += (2 * multiplier);
   });
 
   return scores;
 }
 
-/**
- * Archetype Logic based on 10 Gods (Ten Deities)
- */
 function getArchetype(dm: ElementType, strongest: ElementType, isStrong: boolean): string {
-  // If Strongest is Self (Bi Jian / Jie Cai)
-  if (dm === strongest) {
-     return isStrong ? "🦁 独行侠 (The Maverick)" : "🤝 社交家 (The Connector)";
-  }
-  
-  // If Strongest is Resource (Generates Self)
-  if (getGeneratingElement(strongest) === dm) {
-      // Actually: Resource generates DM. So if Strongest generates DM.
-  }
-  if (getGeneratingElement(dm) === strongest) {
-      return "🦉 智者 (The Sage)";
-  }
-
-  // If Strongest is Output (DM Generates)
-  if (getGeneratingElement(strongest) === dm) { // DM generates Strongest
-      return "🎨 创作者 (The Creator)";
-  }
-
-  // If Strongest is Wealth (DM Controls)
-  if (getControlledElement(dm) === strongest) {
-      return "🏰 建造者 (The Builder)";
-  }
-
-  // If Strongest is Officer/Killing (Controls DM)
-  if (getControllingElement(strongest) === dm) { // Strongest controls DM
-      return "⚔️ 守护者 (The Guardian)";
-  }
-
+  if (dm === strongest) return isStrong ? "🦁 独行侠 (The Maverick)" : "🤝 社交家 (The Connector)";
+  if (getGeneratingElement(dm) === strongest) return "🦉 智者 (The Sage)";
+  if (getGeneratingElement(strongest) === dm) return "🎨 创作者 (The Creator)";
+  if (getControlledElement(dm) === strongest) return "🏰 建造者 (The Builder)";
+  if (getControllingElement(strongest) === dm) return "⚔️ 守护者 (The Guardian)";
   return "🌟 探索者 (The Seeker)";
 }
 
-
-/**
- * Helpers for Element Relationships
- */
-// Wood -> Fire -> Earth -> Gold -> Water -> Wood
 const GENERATION_CYCLE: ElementType[] = ['wood', 'fire', 'earth', 'gold', 'water'];
 
 function getGeneratingElement(target: ElementType): ElementType {
   const idx = GENERATION_CYCLE.indexOf(target);
-  return GENERATION_CYCLE[(idx - 1 + 5) % 5]; // The one that generates target
+  return GENERATION_CYCLE[(idx - 1 + 5) % 5];
 }
 
 function getOutputElement(source: ElementType): ElementType {
@@ -392,7 +223,5 @@ function getControllingElement(target: ElementType): ElementType {
 }
 
 function getElementColorName(e: ElementType): string {
-    const map = { wood: '绿色', fire: '红色', earth: '黄色', gold: '白色', water: '黑色' };
-    return map[e];
+    return ELEMENT_CN_MAP[e];
 }
->>>>>>> cf25f633809e405f7e3780b152f3ac31ed74f478
