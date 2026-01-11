@@ -6,11 +6,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const app = express();
 const port = 3000;
 
-// 允许跨域（解决 Failed to fetch 的关键）
 app.use(cors());
 app.use(express.json());
 
-// 👇 你的 API Key 放这里 (后端是安全的)
+// 你的 API Key
 const API_KEY = "AIzaSyD2C5REWdqnlMAKBLasVlqcCkLN4Bey760";
 
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -19,8 +18,9 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart } = req.body;
     
-    // 使用最稳定的 gemini-pro 模型
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // 👇 关键修改：使用精确版本号 "gemini-1.5-flash-001"
+    // 如果这个还不行，请尝试 "gemini-1.0-pro"
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
 
     const prompt = `
       (角色：精通《穷通宝鉴》的命理大师)
@@ -41,12 +41,11 @@ app.post('/api/analyze', async (req, res) => {
       6. "healthAdvice": 基于五行过旺或过弱的健康预警。
     `;
 
-    console.log("正在向 Google Gemini 请求分析...");
+    console.log("正在向 Google Gemini (1.5-flash-001) 请求分析...");
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    // 清理 Markdown 标记
     const jsonString = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const data = JSON.parse(jsonString);
 
@@ -54,6 +53,7 @@ app.post('/api/analyze', async (req, res) => {
 
   } catch (error) {
     console.error("服务端报错:", error);
+    // 打印更详细的错误信息，方便排查
     res.status(500).json({ error: error.message || "服务器内部错误" });
   }
 });
