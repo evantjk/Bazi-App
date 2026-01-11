@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // 你的 API Key
-const API_KEY = "AIzaSyD2C5REWdqnlMAKBLasVlqcCkLN4Bey760";
+const API_KEY = "AIzaSyCbumuVlE4jvsOD2PewUL5NcXW4IUIe1_M";
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
@@ -18,9 +18,10 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart } = req.body;
     
-    // 👇 关键修改：使用精确版本号 "gemini-1.5-flash-001"
-    // 如果这个还不行，请尝试 "gemini-1.0-pro"
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+    // 👇 关键修复：使用 2026 年的主流稳定版 "gemini-2.5-flash"
+    // 之前的 1.5 系列已经下线，所以才报 404
+    // 如果你想尝鲜最新版，也可以改成 "gemini-3-pro-preview"
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       (角色：精通《穷通宝鉴》的命理大师)
@@ -41,7 +42,7 @@ app.post('/api/analyze', async (req, res) => {
       6. "healthAdvice": 基于五行过旺或过弱的健康预警。
     `;
 
-    console.log("正在向 Google Gemini (1.5-flash-001) 请求分析...");
+    console.log("正在向 Google Gemini (2.5-flash) 请求分析...");
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -53,7 +54,6 @@ app.post('/api/analyze', async (req, res) => {
 
   } catch (error) {
     console.error("服务端报错:", error);
-    // 打印更详细的错误信息，方便排查
     res.status(500).json({ error: error.message || "服务器内部错误" });
   }
 });
