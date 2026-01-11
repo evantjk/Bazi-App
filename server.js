@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 // 👇 你的 API Key 放这里 (后端是安全的)
-const API_KEY = "node server.jsAIzaSyD2C5REWdqnlMAKBLasVlqcCkLN4Bey760";
+const API_KEY = "AIzaSyD2C5REWdqnlMAKBLasVlqcCkLN4Bey760";
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
