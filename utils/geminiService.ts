@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { BaziChart } from "./baziLogic";
 
-// 👇👇👇 请直接把你的 API KEY 粘贴在下面这个引号里 👇👇👇
+// 👇👇👇 你的真实 API KEY 已经填在这里了，不用动 👇👇👇
 const API_KEY = "AIzaSyB52Mg25XPxHfjZ1Q-PSN0VHJVz9ASrEvE"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -16,8 +16,9 @@ export interface AIAnalysisResult {
 }
 
 export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisResult> {
-  // ✅ 修复：只检查是否为空或包含默认提示语，不再拦截你的真实 Key
-  if (!API_KEY || API_KEY === "AIzaSyB52Mg25XPxHfjZ1Q-PSN0VHJVz9ASrEvE" || API_KEY.includes("YOUR_GEMINI")) {
+  // ✅ 修复：删除了原来的 "|| API_KEY === 'AIzaSy...'" 
+  // 现在只拦截包含 "YOUR_KEY" 这种明显没改过的占位符
+  if (!API_KEY || API_KEY.includes("YOUR_GEMINI") || API_KEY.includes("粘贴你的")) {
     console.warn("⚠️ API Key 未配置或无效，正在使用模拟数据");
     return mockAIResponse(chart);
   }
@@ -58,7 +59,7 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
     const response = await result.response;
     const text = response.text();
     
-    // 清理 Markdown 标记
+    // 清理可能存在的 Markdown 代码块标记
     const jsonString = text.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(jsonString);
 
@@ -71,10 +72,10 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
 // 兜底模拟数据
 function mockAIResponse(chart: BaziChart): AIAnalysisResult {
   return {
-    archetype: "等待配置 API Key",
-    summary: "请检查代码 utils/geminiService.ts 中的 API_KEY 是否正确填写。",
-    strengthAnalysis: `系统判定为${chart.strength}。请填写有效的 Gemini API Key 以获取 AI 深度分析。`,
-    bookAdvice: "API 连接未成功，无法检索古籍。",
+    archetype: "AI 连接失败",
+    summary: "请检查控制台 (Console) 的报错信息。",
+    strengthAnalysis: `系统判定为${chart.strength}。请检查 API Key 是否有效，或网络是否通畅。`,
+    bookAdvice: "无法连接 AI 数据库。",
     careerAdvice: "暂无数据。",
     healthAdvice: "暂无数据。"
   };
