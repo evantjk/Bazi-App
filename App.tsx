@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Sparkles, Zap, Scroll, Bot, Menu, X, ArrowRight } from 'lucide-react';
 import { FiveElementChart } from './components/FiveElementChart';
-import { calculateBazi, BaziChart, Pillar } from './utils/baziLogic';
+import { calculateBazi, BaziChart, Pillar, ElementType } from './utils/baziLogic';
 
+// ----------------------------------------------------------------------
+// 子组件：单柱卡片 (PillarCard)
+// ----------------------------------------------------------------------
 const PillarCard = ({ title, pillar }: { title: string; pillar?: Pillar }) => {
-  const getElementColor = (type: string | undefined) => {
+  const getElementColor = (type: ElementType) => {
     switch (type) {
       case 'gold': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
       case 'wood': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
@@ -17,7 +20,7 @@ const PillarCard = ({ title, pillar }: { title: string; pillar?: Pillar }) => {
 
   if (!pillar) return (
     <div className="h-48 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400">
-        Waiting...
+        等待输入...
     </div>
   );
 
@@ -25,13 +28,13 @@ const PillarCard = ({ title, pillar }: { title: string; pillar?: Pillar }) => {
     <div className="flex flex-col items-center bg-white rounded-xl shadow-sm border border-slate-100 p-4 transition-transform hover:-translate-y-1 duration-300">
       <span className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-3">{title}</span>
       
-      {/* Heavenly Stem */}
-      <div className={`w-12 h-12 flex items-center justify-center rounded-full text-2xl font-serif-sc font-bold mb-2 border ${getElementColor(pillar.elementStem)}`}>
+      {/* 天干 */}
+      <div className={`w-12 h-12 flex items-center justify-center rounded-full text-2xl font-serif font-bold mb-2 border ${getElementColor(pillar.elementStem)}`}>
         {pillar.stem}
       </div>
       
-      {/* Earthly Branch */}
-      <div className={`w-16 h-16 flex items-center justify-center rounded-lg text-3xl font-serif-sc font-bold mb-1 border ${getElementColor(pillar.elementBranch)}`}>
+      {/* 地支 */}
+      <div className={`w-16 h-16 flex items-center justify-center rounded-lg text-3xl font-serif font-bold mb-1 border ${getElementColor(pillar.elementBranch)}`}>
         {pillar.branch}
       </div>
       
@@ -42,6 +45,9 @@ const PillarCard = ({ title, pillar }: { title: string; pillar?: Pillar }) => {
   );
 };
 
+// ----------------------------------------------------------------------
+// 主应用组件 (App)
+// ----------------------------------------------------------------------
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -52,15 +58,21 @@ export default function App() {
 
   const handleAnalyze = () => {
     setLoading(true);
-    setSidebarOpen(false); // Close sidebar on mobile
+    setSidebarOpen(false); 
     
-    // Simulate calculation delay for effect
+    // 模拟一点点计算延迟，让用户感觉“正在用力思考”
     setTimeout(() => {
-        const inputDate = new Date(`${date}T${time}`);
-        const chart = calculateBazi(inputDate);
-        setResult(chart);
-        setLoading(false);
-    }, 800);
+        try {
+            const inputDate = new Date(`${date}T${time}`);
+            const chart = calculateBazi(inputDate);
+            setResult(chart);
+        } catch (error) {
+            console.error("排盘失败:", error);
+            alert("排盘出错了，请检查日期是否正确");
+        } finally {
+            setLoading(false);
+        }
+    }, 600);
   };
 
   return (
@@ -165,44 +177,52 @@ export default function App() {
                         <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded uppercase">AI 分析结果</span>
                         <span className="text-slate-400 text-xs">{date} {time}</span>
                     </div>
-                    <h1 className="text-3xl lg:text-4xl font-bold text-slate-800 font-serif-sc mb-1">
-                        🦁 称号：破局的创新者
+                    <h1 className="text-3xl lg:text-4xl font-bold text-slate-800 font-serif mb-1">
+                        {result.archetype}
                     </h1>
-                    <p className="text-slate-500">命带魁罡，刚毅果决，适合开创性事业。</p>
+                    <p className="text-slate-500">
+                      日主 <strong>{result.dayMaster}</strong> ({result.dayMasterElement}) · 
+                      格局判定：<span className={result.strength === '身强' ? 'text-orange-600 font-bold' : 'text-blue-600 font-bold'}>{result.strength}</span>
+                    </p>
                 </div>
                 <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <div className="text-right">
-                        <div className="text-xs font-semibold text-slate-400 uppercase">综合评分</div>
-                        <div className="text-4xl font-bold text-indigo-600">88<span className="text-lg text-slate-400 font-normal">分</span></div>
+                        <div className="text-xs font-semibold text-slate-400 uppercase">命局平衡分</div>
+                        <div className="text-4xl font-bold text-indigo-600">
+                            {result.destinyScore}<span className="text-lg text-slate-400 font-normal">分</span>
+                        </div>
                     </div>
-                    <div className="h-12 w-12 rounded-full border-4 border-indigo-100 border-t-indigo-600 transform -rotate-45"></div>
+                    {/* 根据分数动态显示颜色环 */}
+                    <div className={`h-12 w-12 rounded-full border-4 transform -rotate-45
+                        ${result.destinyScore > 80 ? 'border-indigo-100 border-t-indigo-600' : 'border-orange-100 border-t-orange-500'}
+                    `}></div>
                 </div>
             </div>
 
-            {/* Bazi Chart Grid */}
+            {/* Bazi Chart Grid (Real Data) */}
             <div className="grid grid-cols-4 gap-3 md:gap-6">
-                <PillarCard title="年柱 (Root)" pillar={result.year} />
-                <PillarCard title="月柱 (Shoot)" pillar={result.month} />
-                <PillarCard title="日柱 (Flower)" pillar={result.day} />
-                <PillarCard title="时柱 (Fruit)" pillar={result.hour} />
+                <PillarCard title="年柱" pillar={result.year} />
+                <PillarCard title="月柱" pillar={result.month} />
+                <PillarCard title="日柱" pillar={result.day} />
+                <PillarCard title="时柱" pillar={result.hour} />
             </div>
 
-            {/* Main Analysis Section: Grid with Visuals + Tabs */}
+            {/* Main Analysis Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
-                {/* Visuals (Radar) */}
+                {/* Visuals (Radar Chart) */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col">
                     <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <Zap size={20} className="text-amber-500" />
                         五行能量分布
                     </h3>
                     <div className="flex-1 flex items-center justify-center">
-                        <FiveElementChart />
+                        {/* 传入真实计算的五行分数 */}
+                        <FiveElementChart scores={result.fiveElementScore} />
                     </div>
                     <div className="mt-4 text-center">
                         <p className="text-sm text-slate-500">
-                            <span className="font-bold text-emerald-600">木</span> 气最旺，
-                            <span className="font-bold text-blue-600">水</span> 气偏弱。
+                            能量最强：<span className="font-bold text-indigo-600 uppercase">{result.strongestElement}</span>
                         </p>
                     </div>
                 </div>
@@ -241,17 +261,16 @@ export default function App() {
                             <div className="space-y-4 animate-fade-in-up">
                                 <h4 className="text-lg font-bold text-slate-800">五行强弱分析</h4>
                                 <p className="text-slate-600 leading-relaxed">
-                                    此命局日元为<span className="font-bold text-emerald-600">甲木</span>，生于寅月，得令而旺。
-                                    天干透出比肩，地支有根。整体能量场偏强，具有极强的生命力和向上生长的欲望。
+                                    此命局日元为 <span className="font-bold text-indigo-600">{result.dayMaster}</span> ({result.dayMasterElement})，
+                                    生于 <strong>{result.month.zodiac}</strong> 月。
+                                    系统判定为：<span className="font-bold underline decoration-indigo-300 decoration-2">{result.strength}</span>。
                                 </p>
-                                <p className="text-slate-600 leading-relaxed">
-                                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
-                                    Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-                                </p>
-                                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 mt-4">
-                                    <h5 className="font-semibold text-slate-700 mb-2">喜用神建议</h5>
-                                    <p className="text-sm text-slate-500">
-                                        建议以<span className="font-bold text-red-500">火</span>（食伤）泄秀，或以<span className="font-bold text-yellow-600">金</span>（官杀）修剪枝叶。
+                                <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100 mt-4">
+                                    <h5 className="font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                                        <Sparkles size={16} /> 喜用神建议
+                                    </h5>
+                                    <p className="text-sm text-indigo-800 leading-relaxed">
+                                        {result.favorable}
                                     </p>
                                 </div>
                             </div>
@@ -259,18 +278,15 @@ export default function App() {
 
                         {activeTab === 'ancient' && (
                             <div className="space-y-4 animate-fade-in-up">
-                                <h4 className="text-lg font-bold text-slate-800 font-serif-sc">《三命通会》摘录</h4>
-                                <blockquote className="pl-4 border-l-4 border-indigo-200 italic text-slate-600 bg-slate-50 py-2 pr-2 rounded-r">
-                                    "甲木参天，脱胎要火。春不容金，秋不容土。火炽乘龙，水荡骑虎。地润天和，植立千古。"
-                                </blockquote>
-                                <p className="text-slate-600 leading-relaxed mt-4">
-                                    此段古文说明了甲木的性质。Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
-                                    Excepteur sint occaecat cupidatat non proident.
-                                </p>
-                                <h4 className="text-lg font-bold text-slate-800 font-serif-sc mt-6">《穷通宝鉴》调候</h4>
-                                <p className="text-slate-600 leading-relaxed">
-                                    寅月甲木，初春尚寒，先用丙火温暖，次用癸水滋润。
-                                </p>
+                                <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg">
+                                    <h4 className="text-amber-900 font-bold mb-2">💡 提示</h4>
+                                    <p className="text-amber-800 text-sm">
+                                        古籍断语功能（《穷通宝鉴》与《三命通会》）需要连接完整的文本数据库。
+                                        目前处于 <strong>MVP 阶段</strong>，此处为静态占位符。
+                                        <br/><br/>
+                                        下一步我们将把 <code>yue.py</code> 和 <code>sizi.py</code> 中的数万字古籍数据导入此处。
+                                    </p>
+                                </div>
                             </div>
                         )}
 
@@ -281,15 +297,15 @@ export default function App() {
                                         <Bot size={20} />
                                     </div>
                                     <div>
-                                        <h4 className="text-lg font-bold text-slate-800">现代职业发展建议</h4>
+                                        <h4 className="text-lg font-bold text-slate-800">AI 命理师的建议</h4>
                                         <p className="text-slate-600 leading-relaxed mt-2">
-                                            基于您的五行结构，您具备很强的独立思考能力和领导潜质。适合从事需要开创性、规划性和仁慈之心的行业。
+                                            您的命格原型是 <strong>{result.archetype}</strong>。
                                         </p>
-                                        <ul className="mt-4 space-y-2 text-slate-600 list-disc list-inside">
-                                            <li><strong className="text-slate-800">推荐行业：</strong> 教育培训、园林设计、木材家具、文化出版。</li>
-                                            <li><strong className="text-slate-800">职场风格：</strong> 直率坦诚，不喜欢拐弯抹角，容易成为团队的精神领袖。</li>
-                                            <li><strong className="text-slate-800">注意事项：</strong> 容易固执己见，建议多听取他人意见，保持柔韧性。</li>
-                                        </ul>
+                                        <p className="text-slate-600 leading-relaxed mt-2">
+                                            {result.strength === '身强' 
+                                                ? '作为身强之人，您精力充沛，具有很强的执行力。但也容易流于刚愎自用。建议多倾听他人意见，并将过剩的精力投入到富有挑战性的事业或创作中（食伤泄秀）。' 
+                                                : '作为身弱之人，您心思细腻，善于配合。但也容易感到精力不足或缺乏安全感。建议多依靠团队力量，寻求长辈或导师的支持（印星生身），避免单打独斗。'}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
