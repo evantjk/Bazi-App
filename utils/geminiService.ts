@@ -17,7 +17,7 @@ export interface AIAnalysisResult {
 }
 
 export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisResult> {
-  if (API_KEY === "YOUR_GEMINI_API_KEY_HERE") {
+  if (API_KEY === "AIzaSyB52Mg25XPxHfjZ1Q-PSN0VHJVz9ASrEvE") {
     console.warn("缺少 Gemini API Key，返回模拟数据");
     return mockAIResponse(chart);
   }
