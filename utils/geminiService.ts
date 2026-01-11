@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { BaziChart } from "./baziLogic";
 
 // 👇 请确认您的 Key 依然在这里
-const API_KEY = "AIzaSyD2C5REWdqnlMAKBLasVlqcCkLN4Bey760"; 
+const API_KEY = "AIzaSyB52Mg25XPxHfjZ1Q-PSN0VHJVz9ASrEvE"; 
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
@@ -22,8 +22,8 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
   }
 
   try {
-    // 尝试使用更轻量快速的模型，成功率通常更高
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // 🔄 修复点：切回最稳定的 'gemini-pro' 模型，解决 404 问题
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `
       (角色：精通《穷通宝鉴》的命理大师)
@@ -42,7 +42,7 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
       healthAdvice (健康建议)。
     `;
 
-    console.log("正在请求 Gemini API...");
+    console.log("正在请求 Gemini API (gemini-pro)...");
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -54,29 +54,19 @@ export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisRes
   } catch (error: any) {
     console.error("❌ AI 报错详情:", error);
     
-    // 提取具体的错误信息
     let errorMsg = "未知错误";
-    if (error instanceof Error) {
-        errorMsg = error.message;
-    } else if (typeof error === 'string') {
-        errorMsg = error;
-    }
-
-    // 常见错误翻译
-    if (errorMsg.includes("fetch")) errorMsg += " (网络请求失败，请检查VPN或网络连接)";
-    if (errorMsg.includes("400")) errorMsg += " (请求无效，可能是API Key格式不对)";
-    if (errorMsg.includes("403")) errorMsg += " (权限被拒绝，可能是Key无效或地区不支持)";
-    if (errorMsg.includes("429")) errorMsg += " (请求过于频繁，触发限制)";
+    if (error instanceof Error) errorMsg = error.message;
+    else if (typeof error === 'string') errorMsg = error;
 
     return mockAIResponse(chart, errorMsg);
   }
 }
 
-// 兜底数据显示（带错误报告）
+// 兜底数据显示
 function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
   return {
     archetype: "⚠️ 连接报错",
-    summary: `【错误详情】：${errorMsg}`, // 👈 这里会显示具体原因
+    summary: `【错误详情】：${errorMsg}`,
     strengthAnalysis: "AI 服务暂时不可用，无法进行深度分析。",
     bookAdvice: "无法连接古籍数据库。",
     careerAdvice: "暂无数据。",
