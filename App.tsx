@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Sparkles, Zap, Scroll, Bot, Menu, X, ArrowRight } from 'lucide-react';
 import { FiveElementChart } from './components/FiveElementChart';
-import { calculateBazi, BaziChart, Pillar, ElementType } from './utils/baziLogic';
+import { calculateBazi, BaziChart, Pillar, ElementType, ELEMENT_CN_MAP } from './utils/baziLogic';
 
 // ----------------------------------------------------------------------
 // 子组件：单柱卡片 (PillarCard)
@@ -181,7 +181,7 @@ export default function App() {
                         {result.archetype}
                     </h1>
                     <p className="text-slate-500">
-                      日主 <strong>{result.dayMaster}</strong> ({result.dayMasterElement}) · 
+                      日主 <strong>{result.dayMaster}</strong> ({ELEMENT_CN_MAP[result.dayMasterElement]}) · 
                       格局判定：<span className={result.strength === '身强' ? 'text-orange-600 font-bold' : 'text-blue-600 font-bold'}>{result.strength}</span>
                     </p>
                 </div>
@@ -222,7 +222,7 @@ export default function App() {
                     </div>
                     <div className="mt-4 text-center">
                         <p className="text-sm text-slate-500">
-                            能量最强：<span className="font-bold text-indigo-600 uppercase">{result.strongestElement}</span>
+                            能量最强：<span className="font-bold text-indigo-600">{ELEMENT_CN_MAP[result.strongestElement]}</span>
                         </p>
                     </div>
                 </div>
@@ -261,7 +261,7 @@ export default function App() {
                             <div className="space-y-4 animate-fade-in-up">
                                 <h4 className="text-lg font-bold text-slate-800">五行强弱分析</h4>
                                 <p className="text-slate-600 leading-relaxed">
-                                    此命局日元为 <span className="font-bold text-indigo-600">{result.dayMaster}</span> ({result.dayMasterElement})，
+                                    此命局日元为 <span className="font-bold text-indigo-600">{result.dayMaster}</span> ({ELEMENT_CN_MAP[result.dayMasterElement]})，
                                     生于 <strong>{result.month.zodiac}</strong> 月。
                                     系统判定为：<span className="font-bold underline decoration-indigo-300 decoration-2">{result.strength}</span>。
                                 </p>
