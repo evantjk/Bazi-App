@@ -4,9 +4,9 @@ import { FiveElementChart } from './components/FiveElementChart';
 import { calculateBazi, BaziChart, Pillar, ElementType, ELEMENT_CN_MAP } from './utils/baziLogic';
 
 // ----------------------------------------------------------------------
-// 子组件：单柱卡片 (PillarCard)
+// 子组件：单柱卡片 (PillarCard) - 增强版，显示十神
 // ----------------------------------------------------------------------
-const PillarCard = ({ title, pillar }: { title: string; pillar?: Pillar }) => {
+const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: Pillar; isDayMaster?: boolean }) => {
   const getElementColor = (type: ElementType) => {
     switch (type) {
       case 'gold': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
@@ -25,21 +25,34 @@ const PillarCard = ({ title, pillar }: { title: string; pillar?: Pillar }) => {
   );
 
   return (
-    <div className="flex flex-col items-center bg-white rounded-xl shadow-sm border border-slate-100 p-4 transition-transform hover:-translate-y-1 duration-300">
-      <span className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-3">{title}</span>
+    <div className="flex flex-col items-center bg-white rounded-xl shadow-sm border border-slate-100 p-3 lg:p-4 transition-transform hover:-translate-y-1 duration-300 relative overflow-hidden">
+      <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-2">{title}</span>
       
+      {/* 天干十神 */}
+      {!isDayMaster && (
+        <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded mb-1">
+          {pillar.tenGodStem}
+        </span>
+      )}
+      {isDayMaster && (
+        <span className="text-[10px] text-white bg-indigo-500 px-1.5 py-0.5 rounded mb-1">
+          日主
+        </span>
+      )}
+
       {/* 天干 */}
-      <div className={`w-12 h-12 flex items-center justify-center rounded-full text-2xl font-serif font-bold mb-2 border ${getElementColor(pillar.elementStem)}`}>
+      <div className={`w-10 h-10 lg:w-12 lg:h-12 flex items-center justify-center rounded-full text-xl lg:text-2xl font-serif font-bold mb-2 border ${getElementColor(pillar.elementStem)}`}>
         {pillar.stem}
       </div>
       
       {/* 地支 */}
-      <div className={`w-16 h-16 flex items-center justify-center rounded-lg text-3xl font-serif font-bold mb-1 border ${getElementColor(pillar.elementBranch)}`}>
+      <div className={`w-14 h-14 lg:w-16 lg:h-16 flex items-center justify-center rounded-lg text-2xl lg:text-3xl font-serif font-bold mb-1 border ${getElementColor(pillar.elementBranch)}`}>
         {pillar.branch}
       </div>
       
-      <span className="text-xs text-slate-500 font-medium">
-        [{pillar.zodiac}]
+      {/* 藏干主气 */}
+      <span className="text-[10px] text-slate-400 mt-1">
+        {pillar.zodiac} · {pillar.hiddenStems[0]} ({pillar.tenGodBranch.main})
       </span>
     </div>
   );
@@ -60,7 +73,6 @@ export default function App() {
     setLoading(true);
     setSidebarOpen(false); 
     
-    // 模拟一点点计算延迟，让用户感觉“正在用力思考”
     setTimeout(() => {
         try {
             const inputDate = new Date(`${date}T${time}`);
@@ -200,10 +212,10 @@ export default function App() {
             </div>
 
             {/* Bazi Chart Grid (Real Data) */}
-            <div className="grid grid-cols-4 gap-3 md:gap-6">
+            <div className="grid grid-cols-4 gap-2 md:gap-6">
                 <PillarCard title="年柱" pillar={result.year} />
                 <PillarCard title="月柱" pillar={result.month} />
-                <PillarCard title="日柱" pillar={result.day} />
+                <PillarCard title="日柱" pillar={result.day} isDayMaster={true} />
                 <PillarCard title="时柱" pillar={result.hour} />
             </div>
 
@@ -236,7 +248,7 @@ export default function App() {
                                 ${activeTab === 'energy' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
                             `}
                         >
-                            <Zap size={16} /> 能量分析
+                            <Zap size={16} /> 能量与强弱
                         </button>
                         <button 
                             onClick={() => setActiveTab('ancient')}
@@ -244,7 +256,7 @@ export default function App() {
                                 ${activeTab === 'ancient' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}
                             `}
                         >
-                            <Scroll size={16} /> 古籍断语
+                            <Scroll size={16} /> 《穷通宝鉴》
                         </button>
                         <button 
                             onClick={() => setActiveTab('ai')}
@@ -259,11 +271,12 @@ export default function App() {
                     <div className="p-6 md:p-8 flex-1 overflow-y-auto">
                         {activeTab === 'energy' && (
                             <div className="space-y-4 animate-fade-in-up">
-                                <h4 className="text-lg font-bold text-slate-800">五行强弱分析</h4>
+                                <h4 className="text-lg font-bold text-slate-800">格局与喜忌</h4>
                                 <p className="text-slate-600 leading-relaxed">
                                     此命局日元为 <span className="font-bold text-indigo-600">{result.dayMaster}</span> ({ELEMENT_CN_MAP[result.dayMasterElement]})，
-                                    生于 <strong>{result.month.zodiac}</strong> 月。
-                                    系统判定为：<span className="font-bold underline decoration-indigo-300 decoration-2">{result.strength}</span>。
+                                    生于 <strong>{result.month.zodiac}</strong> 月（{result.month.elementBranch === result.dayMasterElement ? '得令' : '不得令'}）。
+                                    <br/>
+                                    系统综合判定为：<span className="font-bold underline decoration-indigo-300 decoration-2">{result.strength}</span>。
                                 </p>
                                 <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100 mt-4">
                                     <h5 className="font-semibold text-indigo-900 mb-2 flex items-center gap-2">
@@ -279,12 +292,12 @@ export default function App() {
                         {activeTab === 'ancient' && (
                             <div className="space-y-4 animate-fade-in-up">
                                 <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg">
-                                    <h4 className="text-amber-900 font-bold mb-2">💡 提示</h4>
-                                    <p className="text-amber-800 text-sm">
-                                        古籍断语功能（《穷通宝鉴》与《三命通会》）需要连接完整的文本数据库。
-                                        目前处于 <strong>MVP 阶段</strong>，此处为静态占位符。
-                                        <br/><br/>
-                                        下一步我们将把 <code>yue.py</code> 和 <code>sizi.py</code> 中的数万字古籍数据导入此处。
+                                    <h4 className="text-amber-900 font-bold mb-2 font-serif-sc">📜 《穷通宝鉴》调候</h4>
+                                    <p className="text-amber-800 text-sm leading-7 font-serif-sc">
+                                        {result.bookAdvice}
+                                    </p>
+                                    <p className="text-xs text-amber-500 mt-4 italic border-t border-amber-200 pt-2">
+                                        *注：此处展示基于“日干”与“月支”的经典古籍理论，为静态匹配结果。
                                     </p>
                                 </div>
                             </div>
@@ -303,8 +316,8 @@ export default function App() {
                                         </p>
                                         <p className="text-slate-600 leading-relaxed mt-2">
                                             {result.strength === '身强' 
-                                                ? '作为身强之人，您精力充沛，具有很强的执行力。但也容易流于刚愎自用。建议多倾听他人意见，并将过剩的精力投入到富有挑战性的事业或创作中（食伤泄秀）。' 
-                                                : '作为身弱之人，您心思细腻，善于配合。但也容易感到精力不足或缺乏安全感。建议多依靠团队力量，寻求长辈或导师的支持（印星生身），避免单打独斗。'}
+                                                ? '作为身强之人，您精力充沛，自我意识较强。在十神关系中，您可能比肩或劫财较重，容易坚持己见。建议多倾听他人（官杀制身）或将精力发泄在创造（食伤）上。' 
+                                                : '作为身弱之人，您可能正官或七杀较重，容易感到压力或责任感过大。建议寻求印星（长辈、学习）的支持，或比劫（朋友、合伙）的帮助，避免独自承担过重风险。'}
                                         </p>
                                     </div>
                                 </div>
