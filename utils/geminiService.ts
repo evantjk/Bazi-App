@@ -1,7 +1,8 @@
+// 文件名: utils/geminiService.ts
 import { BaziChart } from "./baziLogic";
 
-// 前端不再需要 API Key，也不需要 Google SDK
-// const API_KEY = "xxxxxxxx"; <--- 已移除，安全！
+// ⚠️ 注意：这里不需要 API Key 了，也不需要 GoogleGenerativeAI 库
+// 所有的 AI 逻辑都移到了 server.js 里
 
 export interface AIAnalysisResult {
   archetype: string;
@@ -14,37 +15,35 @@ export interface AIAnalysisResult {
 
 export async function analyzeBaziWithAI(chart: BaziChart): Promise<AIAnalysisResult> {
   try {
-    console.log("正在请求本地后端服务器...");
+    console.log("正在请求本地后端服务器 (localhost:3000)...");
     
-    // 向我们刚才创建的 server.js 发起请求
+    // 👇 这里是向你自己的 server.js 发送请求
     const response = await fetch('http://localhost:3000/api/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ chart }), // 发送八字数据
+      body: JSON.stringify({ chart }), 
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.details || "后端请求失败");
+      throw new Error(`服务器连接失败: ${response.statusText}`);
     }
 
     const data = await response.json();
     return data as AIAnalysisResult;
 
   } catch (error: any) {
-    console.error("❌ AI 分析失败:", error);
-    return mockAIResponse(chart, error.message || "连接服务器失败");
+    console.error("前端请求失败:", error);
+    return mockAIResponse(chart, error.message || "无法连接到后端服务器");
   }
 }
 
-// 兜底模拟数据
 function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
   return {
-    archetype: "⚠️ 连接失败",
+    archetype: "连接失败",
     summary: `【错误详情】：${errorMsg}`,
-    strengthAnalysis: "请确保你已经运行了 'node server.js' 并且后端服务器正常工作。",
+    strengthAnalysis: "请确保你已经打开了第二个终端并运行了 'node server.js'。",
     bookAdvice: "无法连接后端。",
     careerAdvice: "暂无数据。",
     healthAdvice: "暂无数据。"
