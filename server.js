@@ -17,6 +17,9 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart, currentYear } = req.body; 
     
+    // 🛠️ 保护性获取大运，防止崩溃
+    const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(', ') : "暂无大运数据";
+
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
       generationConfig: {
@@ -34,7 +37,7 @@ app.post('/api/analyze', async (req, res) => {
       八字：${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
       日主：${chart.dayMaster} (${chart.dayMasterElement})
       格局：${chart.strength}
-      大运：${chart.daYun.map(d => d.ganZhi).join(', ')} (AI请自行推算当前大运)
+      大运：${daYunStr} (AI请自行推算当前大运)
       当前流年：${currentYear}年 (丙午年)
 
       【分析要求 (必须返回纯JSON)】
@@ -70,7 +73,6 @@ app.post('/api/analyze', async (req, res) => {
     // console.log("AI 原始返回:", text); // 调试用
 
     // 🧹 核心修复：使用正则提取第一个 "{" 和最后一个 "}" 之间的内容
-    // 这能完美过滤掉 "```json" 或者结尾的 "希望这对你有帮助"
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     
     if (!jsonMatch) {

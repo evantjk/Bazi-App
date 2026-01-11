@@ -43,14 +43,14 @@ export interface BaziChart {
     trueSolarTime: string;
     location: string;
     equationOfTime: string;
-    longitudeOffset: string; // 新增：显示经度时差，方便核对
+    longitudeOffset: string;
     gender: string;
   };
   year: Pillar;
   month: Pillar;
   day: Pillar;
   hour: Pillar;
-  daYun: DaYun[];
+  daYun: DaYun[]; // ✅ 必须包含此字段
   fiveElementScore: FiveElementScore;
   destinyScore: number;
   dayMaster: string;
@@ -106,33 +106,19 @@ const BRANCH_DETAILS: Record<string, { element: ElementType; zodiac: string; hid
   '亥': { element: 'water', zodiac: '猪', hidden: ['壬', '甲'] },
 };
 
-// --- 核心修复：超级强壮的经度解析器 ---
-// 解决 "103°45'34" 解析失败的问题
 export function parseLongitude(input: string): number {
   if (!input) return 120;
-  
-  // 1. 先尝试直接转数字 (比如用户输入 "103.75")
   const directNum = Number(input.trim());
   if (!isNaN(directNum)) return directNum;
-
-  // 2. 暴力清洗：把所有非数字和小数点的字符都替换成空格
-  // "103°45'34"" -> "103 45 34"
-  // "103度45分" -> "103 45"
   const cleanStr = input.replace(/[^0-9.]/g, ' ').trim();
-  
-  // 3. 分割并提取数字
   const parts = cleanStr.split(/\s+/).filter(p => p !== '');
-  
-  if (parts.length === 0) return 120; // 无法解析则回退
-
+  if (parts.length === 0) return 120;
   let deg = parseFloat(parts[0]);
   let min = parts.length > 1 ? parseFloat(parts[1]) : 0;
   let sec = parts.length > 2 ? parseFloat(parts[2]) : 0;
-
   return deg + (min / 60) + (sec / 3600);
 }
 
-// 均时差计算 (保持不变，因为您的验证说明这部分是对的)
 function getEquationOfTime(date: Date): number {
   const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000);
   const B = (dayOfYear - 81) * 360 / 365 * (Math.PI / 180); 
@@ -142,69 +128,40 @@ function getEquationOfTime(date: Date): number {
 // --- Main Logic ---
 
 export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gender): BaziChart {
-  
   const longitude = parseLongitude(longitudeStr);
-  const tzStandard = 120; // 假设输入时间为 UTC+8 标准时间
+  const tzStandard = 120; 
 
-  // 1. 经度时差 (Longitude Offset)
-  // 如果是 103度，这里应该是 (103 - 120) * 4 = -68分钟左右
   const longOffsetMinutes = (longitude - tzStandard) * 4;
-
-  // 2. 均时差 (Equation of Time)
   const eotMinutes = getEquationOfTime(inputDate);
-
-  // 3. 总修正量 = 经度差 + 均时差
-  // 例子: -65m (经度) + 16m (均时差) = -49m
-  // 11:12 - 49m = 10:23. 完美！
   const totalOffsetMinutes = longOffsetMinutes + eotMinutes;
   
-  // TST Date 对象
   const trueSolarDate = new Date(inputDate.getTime() + totalOffsetMinutes * 60000);
 
-  // --- 双时制混合排盘 (Hybrid) ---
-  
-  // 对象A：标准时间 Solar (用于推算年、月、节气、大运)
-  // 节气是物理时刻，不随真太阳时变化
   const solarStandard = Solar.fromYmdHms(
-    inputDate.getFullYear(),
-    inputDate.getMonth() + 1,
-    inputDate.getDate(),
-    inputDate.getHours(),
-    inputDate.getMinutes(),
-    inputDate.getSeconds()
+    inputDate.getFullYear(), inputDate.getMonth() + 1, inputDate.getDate(),
+    inputDate.getHours(), inputDate.getMinutes(), inputDate.getSeconds()
   );
 
-  // 对象B：真太阳时 Solar (只用于推算 日柱、时柱)
-  // 因为日柱和时柱是看头顶太阳的位置
   const solarTST = Solar.fromYmdHms(
-    trueSolarDate.getFullYear(),
-    trueSolarDate.getMonth() + 1,
-    trueSolarDate.getDate(),
-    trueSolarDate.getHours(),
-    trueSolarDate.getMinutes(),
-    trueSolarDate.getSeconds()
+    trueSolarDate.getFullYear(), trueSolarDate.getMonth() + 1, trueSolarDate.getDate(),
+    trueSolarDate.getHours(), trueSolarDate.getMinutes(), trueSolarDate.getSeconds()
   );
 
   const lunarStandard = solarStandard.getLunar();
   const eightCharStandard = lunarStandard.getEightChar();
-  eightCharStandard.setSect(1); // 晚子时算第二天
+  eightCharStandard.setSect(1); 
 
   const lunarTST = solarTST.getLunar();
   const eightCharTST = lunarTST.getEightChar();
   eightCharTST.setSect(1);
 
-  // 4. 混合组装
-  const yearGan = eightCharStandard.getYearGan(); 
-  const yearZhi = eightCharStandard.getYearZhi();
-  const monthGan = eightCharStandard.getMonthGan(); 
-  const monthZhi = eightCharStandard.getMonthZhi();
+  const yearGan = eightCharStandard.getYearGan(); const yearZhi = eightCharStandard.getYearZhi();
+  const monthGan = eightCharStandard.getMonthGan(); const monthZhi = eightCharStandard.getMonthZhi();
 
-  const dayGan = eightCharTST.getDayGan(); 
-  const dayZhi = eightCharTST.getDayZhi();
-  const timeGan = eightCharTST.getTimeGan(); 
-  const timeZhi = eightCharTST.getTimeZhi();
+  const dayGan = eightCharTST.getDayGan(); const dayZhi = eightCharTST.getDayZhi();
+  const timeGan = eightCharTST.getTimeGan(); const timeZhi = eightCharTST.getTimeZhi();
 
-  // --- 大运计算 (基于标准节气) ---
+  // ✅ 计算大运
   const yun = eightCharStandard.getYun(gender === 'male' ? 1 : 0);
   const daYunArrNative = yun.getDaYun();
   
@@ -221,7 +178,6 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
     });
   }
 
-  // --- 组装对象 ---
   const dayMaster = dayGan;
   const dayMasterDetail = STEM_DETAILS[dayMaster];
   const monthBranchDetail = BRANCH_DETAILS[monthZhi];
@@ -252,11 +208,11 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
         trueSolarTime: tstStr,
         location: longitudeStr,
         equationOfTime: eotDisplay,
-        longitudeOffset: longOffsetDisplay, // 方便调试
+        longitudeOffset: longOffsetDisplay, 
         gender: gender === 'male' ? '男' : '女'
     },
     year: yearPillar, month: monthPillar, day: dayPillar, hour: hourPillar,
-    daYun: daYunList,
+    daYun: daYunList, // ✅ 返回大运
     fiveElementScore: scores, destinyScore,
     dayMaster, dayMasterElement: dayMasterDetail.element,
     strength: strengthResult.desc,
@@ -265,7 +221,7 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
   };
 }
 
-// --- Helper Functions (保持不变) ---
+// --- Helper Functions ---
 function createPillar(stem: string, branch: string, dayMaster: string, kw: string[], yZhi: string, dZhi: string, mZhi: string): Pillar {
   const sDetail = STEM_DETAILS[stem];
   const bDetail = BRANCH_DETAILS[branch];

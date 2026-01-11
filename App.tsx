@@ -4,7 +4,7 @@ import { FiveElementChart } from './components/FiveElementChart';
 import { calculateBazi, BaziChart, Pillar, ElementType, Gender } from './utils/baziLogic';
 import { analyzeBaziWithAI, AIAnalysisResult } from './utils/geminiService';
 
-// --- 子组件：单柱卡片 (保持不变) ---
+// --- 子组件：单柱卡片 ---
 const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: Pillar; isDayMaster?: boolean }) => {
   const getElementColor = (type: ElementType) => {
     switch (type) {
@@ -42,7 +42,7 @@ export default function App() {
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState<string>("12:00");
   const [longitude, setLongitude] = useState<string>("120");
-  const [gender, setGender] = useState<Gender>('male'); // 新增性别状态
+  const [gender, setGender] = useState<Gender>('male');
   
   const [result, setResult] = useState<BaziChart | null>(null);
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
@@ -63,7 +63,6 @@ export default function App() {
     let chart: BaziChart;
     try {
         const inputDate = new Date(`${date}T${time}`);
-        // 传入 gender
         chart = calculateBazi(inputDate, longitude, gender);
         setResult(chart);
     } catch (error) {
@@ -74,7 +73,6 @@ export default function App() {
     setLoading(false);
 
     try {
-        // 请求 AI 分析 (默认分析 2026)
         const analysis = await analyzeBaziWithAI(chart, 2026);
         setAiResult(analysis);
     } catch (error) {
@@ -96,7 +94,6 @@ export default function App() {
             <div><h1 className="text-xl font-bold tracking-tight">命理实验室</h1><span className="text-[10px] text-indigo-300 uppercase tracking-widest border border-indigo-700 px-1 rounded">AI Pro</span></div>
           </div>
           <div className="space-y-6 flex-1 overflow-y-auto">
-            {/* 性别选择 */}
             <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Baby size={12}/> 性别 (影响大运)</label>
                 <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
@@ -104,7 +101,6 @@ export default function App() {
                     <button onClick={() => setGender('female')} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${gender==='female' ? 'bg-pink-600 text-white' : 'text-slate-400 hover:text-white'}`}>女</button>
                 </div>
             </div>
-
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Calendar size={12}/> 出生日期</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Clock size={12}/> 出生时间</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Globe size={12}/> 出生地经度</label><input type="text" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="如: 103°45'34" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
@@ -125,11 +121,8 @@ export default function App() {
 
         {result && (
           <div className="max-w-6xl mx-auto p-6 lg:p-10 space-y-8 animate-fade-in">
-            
-            {/* 顶部横幅 */}
             <div className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm border border-slate-100 relative overflow-hidden flex flex-col md:flex-row justify-between gap-6">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-                
                 <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-3">
                         <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded uppercase">Gemini 2.5 Analysis</span>
@@ -143,7 +136,6 @@ export default function App() {
                         "{aiResult ? aiResult.summary : 'AI 正在阅读您的星盘...'}"
                     </p>
                 </div>
-
                 <div className="flex items-center gap-6">
                     {aiResult && (
                         <div className="flex flex-col items-center">
@@ -160,7 +152,6 @@ export default function App() {
                 </div>
             </div>
 
-            {/* 四柱显示 */}
             <div className="grid grid-cols-4 gap-2 md:gap-6">
                 <PillarCard title="年柱" pillar={result.year} />
                 <PillarCard title="月柱" pillar={result.month} />
@@ -168,14 +159,14 @@ export default function App() {
                 <PillarCard title="时柱" pillar={result.hour} />
             </div>
             
-            {/* 大运时间轴 (新功能) */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 overflow-x-auto">
                 <div className="flex justify-between items-center mb-2 px-2">
                     <h3 className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1"><TrendingUp size={12}/> 大运排盘</h3>
                     <span className="text-xs text-slate-400">每10年一运</span>
                 </div>
                 <div className="flex gap-4 min-w-max pb-2">
-                    {result.daYun.map((yun, idx) => (
+                    {/* ✅ 修复点：添加 ? 防止数组不存在时白屏 */}
+                    {result.daYun?.map((yun, idx) => (
                         <div key={idx} className="flex flex-col items-center bg-slate-50 border border-slate-100 rounded-lg p-2 min-w-[70px]">
                             <span className="text-[10px] text-slate-400 mb-1">{yun.startAge}岁</span>
                             <span className="text-lg font-serif font-bold text-slate-700">{yun.ganZhi}</span>
@@ -186,14 +177,11 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* 左侧 */}
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                         <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">五行能量</h3>
                         <FiveElementChart scores={result.fiveElementScore} />
                     </div>
-                    
-                    {/* 容貌分析 (新功能) */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                          <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
                             <Smile size={16}/> 容貌分析
@@ -204,7 +192,6 @@ export default function App() {
                             </p>
                          ) : <div className="animate-pulse h-20 bg-slate-50 rounded"></div>}
                     </div>
-
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                         <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
                             <User size={16}/> 历史相似人物
@@ -230,7 +217,6 @@ export default function App() {
                     </div>
                 </div>
 
-                {/* 右侧 Tab */}
                 <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-[500px]">
                     <div className="flex border-b border-slate-100 overflow-x-auto">
                         <button onClick={() => setActiveTab('energy')} className={`flex-1 py-4 text-sm font-medium whitespace-nowrap px-4 ${activeTab==='energy'?'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50':'text-slate-500'}`}>
@@ -267,8 +253,6 @@ export default function App() {
                                         </div>
                                     </div>
                                 )}
-                                
-                                {/* 流年运势 Tab (新功能) */}
                                 {activeTab === 'luck' && (
                                     <div className="space-y-6 animate-fade-in-up">
                                         <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-xl">
@@ -282,7 +266,6 @@ export default function App() {
                                         <p className="text-xs text-slate-400 text-center">* 运势分析基于原局、大运与流年的五行生克关系推导</p>
                                     </div>
                                 )}
-
                                 {activeTab === 'ancient' && (
                                     <div className="space-y-6 animate-fade-in-up">
                                         <div className="p-6 bg-amber-50 border border-amber-100 rounded-xl">
@@ -302,7 +285,6 @@ export default function App() {
                                         </div>
                                     </div>
                                 )}
-
                                 {activeTab === 'career' && (
                                     <div className="space-y-6 animate-fade-in-up">
                                          <div>
