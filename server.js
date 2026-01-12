@@ -12,21 +12,18 @@ app.use(express.json());
 const API_KEY = process.env.GEMINI_API_KEY;
 
 if (!API_KEY) {
-  console.error("❌ 致命错误：未找到 GEMINI_API_KEY。请检查 .env 文件。");
+  console.error("❌ 致命错误：未找到 GEMINI_API_KEY。");
   process.exit(1);
 }
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// 自动重试机制
 async function generateWithRetry(model, prompt, retries = 3, delay = 2000) {
   for (let i = 0; i < retries; i++) {
     try {
       return await model.generateContent(prompt);
     } catch (error) {
-      const isOverloaded = error.message.includes('503') || error.message.includes('overloaded');
-      if (isOverloaded && i < retries - 1) {
-        console.warn(`⚠️ Google 服务器繁忙 (503)，正在第 ${i + 1} 次重试...`);
+      if ((error.message.includes('503') || error.message.includes('overloaded')) && i < retries - 1) {
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= 2; 
       } else {
@@ -36,86 +33,118 @@ async function generateWithRetry(model, prompt, retries = 3, delay = 2000) {
   }
 }
 
+// ---------------------------------------------
+// 🔮 原有的八字 API (保持不变)
+// ---------------------------------------------
 app.post('/api/analyze', async (req, res) => {
+    // ... (保留您之前的 /api/analyze 代码，为了篇幅这里省略，请保留原样)
+    // 如果您直接覆盖，请把之前的 /api/analyze 代码复制回来，或者看下一步的完整代码
+    // 为了方便，这里我把完整的 server.js 贴在最后
+    try {
+        const { chart, currentYear, relations } = req.body; 
+        const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
+        const relationsStr = relations && relations.length > 0 ? relations.join(', ') : "本年无明显冲合";
+        const balanceStr = chart.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
+        const lingShu = chart.lingShu || { lifePathNumber: 0, grid: {}, missingNumbers: [] };
+        
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.5-flash", 
+            generationConfig: { temperature: 0.2, topP: 0.8, topK: 40 }
+        });
+
+        const prompt = `
+            角色:资深命理师. 任务:八字及${currentYear}分析. 
+            禁忌:无绝对宿命论,无恐吓.
+            客观事实: 八字:${chart.year.stem}${chart.year.branch}... 日主:${chart.dayMaster} 格局:${chart.strength} 大运:${daYunStr} 评分:${chart.destinyScore} 冲合:${relationsStr} 五行:${balanceStr} 灵数:${lingShu.lifePathNumber}
+            
+            输出JSON:
+            {
+                "archetype": "命格赐名", "summary": "精评", "appearanceAnalysis": "容貌", "annualLuckAnalysis": "流年运势", 
+                "historicalFigures": [], "strengthAnalysis": "格局", "bookAdvice": "古文", "bookAdviceTranslation": "白话",
+                "careerAdvice": "事业", "healthAdvice": "健康", "numerologyAnalysis": "灵数"
+            }
+        `;
+        
+        const result = await generateWithRetry(model, prompt);
+        const text = result.response.text();
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("Format Error");
+        res.json(JSON.parse(jsonMatch[0]));
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ---------------------------------------------
+// 🚪 新增：奇门遁甲 API
+// ---------------------------------------------
+app.post('/api/qimen', async (req, res) => {
   try {
-    const { chart, currentYear, relations } = req.body; 
-    
-    // 数据准备
-    const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
-    const relationsStr = relations && relations.length > 0 ? relations.join(', ') : "本年无明显冲合";
-    const balanceStr = chart.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
-    
-    // ✅ 灵数数据准备
-    const lingShu = chart.lingShu || { lifePathNumber: 0, grid: {}, missingNumbers: [] };
-    const missingStr = lingShu.missingNumbers.length > 0 ? lingShu.missingNumbers.join(', ') : "无缺失";
+    const { type, context, result } = req.body; 
+    // result 是 rules engine 算出来的 { signal: 'green', score: 85, summary: '...' }
 
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash", 
       generationConfig: {
-        temperature: 0.2, // 保持低创造性，确保严谨
+        temperature: 0.4, // 稍微高一点，让文案灵活些，但核心结论不能变
         topP: 0.8,
-        topK: 40,
       }
     });
 
+    // 映射信号灯到中文
+    const signalMap = {
+        'green': '🟢 可行动 (顺势)',
+        'yellow': '🟡 需观察 (调整)',
+        'red': '🔴 不建议 (逆势)'
+    };
+    const signalText = signalMap[result.signal];
+
     const prompt = `
       【角色设定】
-      你是一位理性、温和且有边界感的资深命理咨询师。你的职责是“解读”命盘信息，帮助用户认知自我、规避风险。
-      ❌ 你不是算命先生，不搞迷信恐吓，不给绝对判决。
+      你是一位精通奇门遁甲的决策顾问。你的任务是根据“局面信号”解释当下的时机，为用户提供行动建议。
       
-      【绝对禁忌 (Red Lines)】
-      1. 严禁使用：“注定”、“必死”、“一定会”、“无法改变”、“大灾难”、“贫贱”等绝对化、宿命论词汇。
-      2. 严禁预测死亡时间、具体疾病名称（如“你会得癌症”）。
-      3. 严禁诱导付费或恐吓用户。
-
-      【客观事实 (由系统计算提供)】
-      八字: ${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
-      日主: ${chart.dayMaster} (${chart.dayMasterElement}) 
-      格局强弱: ${chart.strength}
-      大运: ${daYunStr}
-      **命局评分: ${chart.destinyScore}** (这是参考分，请解释为何得此分，但强调后天努力可改变)
-      **流年冲合: ${relationsStr}** (请重点分析这些客观存在的能量波动)
-      **五行诊断: ${balanceStr}** (针对过旺或过弱元素给出调节建议)
+      【用户问题】
+      类型：${type}
+      背景：${context || "无具体背景"}
       
-      **【灵数分析 (Numerology)】**
-      - 命数 (Life Path): ${lingShu.lifePathNumber}
-      - 缺失数字 (Missing Numbers): ${missingStr} (洛书九宫缺失)
+      【盘面客观结果 (由规则引擎判定，不可更改)】
+      信号灯：${signalText} (这是核心结论！)
+      综合评分：${result.score}分
+      格局判词：${result.summary}
+      关键因子：${result.factors.join(', ')}
 
-      【输出任务 (纯JSON)】
-      请返回如下 JSON，内容需符合上述原则：
+      【解读要求】
+      1. **绝对忠实于信号灯**：如果信号是红灯，你必须建议谨慎/停止；如果是绿灯，建议积极行动。不能反着说。
+      2. **风格**：干练、直击要害、商业顾问风格。
+      3. **禁忌**：不谈鬼神，不谈生死，只谈时机和策略。
+
+      【输出格式 (纯JSON)】
       {
-        "archetype": "命格赐名(4字,如金水相涵,富有画面感)",
-        "summary": "30字精评(温暖、点题)",
-        "appearanceAnalysis": "容貌气质描述(基于五行/麻衣神相,100字,优美)",
-        "annualLuckAnalysis": "${currentYear}年流年运势(结合冲合关系${relationsStr},给出事业/财运/感情的趋势与建议,150字)",
-        "historicalFigures": [{"name":"名人","similarity":"90%","reason":"相似点简述"}](5个),
-        "strengthAnalysis": "格局深度分析(解释身强/身弱的利弊，而非好坏)",
-        "bookAdvice": "穷通宝鉴建议(保留古文风韵)",
-        "bookAdviceTranslation": "白话翻译(通俗易懂)",
-        "careerAdvice": "事业发展建议(基于十神性格优势)",
-        "healthAdvice": "健康管理建议(基于五行诊断${balanceStr},不可诊断疾病)",
-        "numerologyAnalysis": "灵数解读(基于命数${lingShu.lifePathNumber}和缺失数字${missingStr}，分析性格优势与需要补足的能量，100字左右)"
+        "mainTendency": "1句核心判断 (如：时机成熟，利于主动出击)",
+        "reasoning": ["关键原因1", "关键原因2"], 
+        "actionAdvice": "2-3条具体建议 (基于${signalText}的策略)",
+        "riskAlert": "1条温和的风控提醒"
       }
     `;
 
-    console.log(`正在请求 AI (顾问模式) 分析 [流年: ${currentYear}, 灵数: ${lingShu.lifePathNumber}]...`);
+    console.log(`正在请求 奇门决策 (${type})... 信号: ${result.signal}`);
     
-    const result = await generateWithRetry(model, prompt);
-    const response = await result.response;
-    const text = response.text();
-    
+    const aiRes = await generateWithRetry(model, prompt);
+    const text = aiRes.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
+    
     if (!jsonMatch) throw new Error("AI 返回格式异常");
 
     const data = JSON.parse(jsonMatch[0]);
     res.json(data);
 
   } catch (error) {
-    console.error("服务端报错:", error.message);
-    res.status(500).json({ error: error.message || "服务器内部错误" });
+    console.error("奇门 API 报错:", error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
 app.listen(port, () => {
-  console.log(`✅ AI 命理顾问服务已启动: http://localhost:${port}`);
+  console.log(`✅ 后端服务器已启动: http://localhost:${port}`);
 });

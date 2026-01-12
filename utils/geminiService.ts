@@ -1,4 +1,5 @@
 import { BaziChart } from "./baziLogic";
+import { QimenResult, QimenType } from "./qimenLogic"; // 引入类型
 
 export interface HistoricalFigure {
   name: string;
@@ -17,54 +18,59 @@ export interface AIAnalysisResult {
   bookAdviceTranslation: string;
   careerAdvice: string;
   healthAdvice: string;
-  numerologyAnalysis: string; // ✅ 新增：灵数解读字段
+  numerologyAnalysis: string;
 }
 
+// 奇门 AI 结果接口
+export interface QimenAIResult {
+  mainTendency: string;
+  reasoning: string[];
+  actionAdvice: string;
+  riskAlert: string;
+}
+
+// 原有的八字分析
 export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 2026, relations: string[] = []): Promise<AIAnalysisResult> {
+  // ... (保持原有的 fetch 代码，为了节省篇幅，这里复用您之前的代码)
+  // 请确保这里包含 fetch('/api/analyze') 的逻辑
   try {
-    console.log("正在请求后端 API (/api/analyze)...");
-    
     const response = await fetch('/api/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // ✅ 传输 currentYear 和 本地计算的 relations
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chart, currentYear, relations }), 
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMsg = response.statusText;
-      try {
-         const jsonError = JSON.parse(errorText);
-         if(jsonError.error) errorMsg = jsonError.error;
-      } catch(e) {}
-      
-      throw new Error(`请求失败 (${response.status}): ${errorMsg}`);
-    }
-
-    const data = await response.json();
-    return data as AIAnalysisResult;
-
+    if (!response.ok) throw new Error("Server Error");
+    return await response.json();
   } catch (error: any) {
-    console.error("❌ 前端请求失败:", error);
-    return mockAIResponse(chart, error.message || "无法连接到后端服务器");
+    console.error("Fetch Error:", error);
+    return mockAIResponse(chart, error.message);
+  }
+}
+
+// ✅ 新增：奇门分析
+export async function analyzeQimenWithAI(type: QimenType, context: string, result: QimenResult): Promise<QimenAIResult> {
+  try {
+    const response = await fetch('/api/qimen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, context, result }), 
+    });
+    if (!response.ok) throw new Error("Server Error");
+    return await response.json();
+  } catch (error: any) {
+    return {
+      mainTendency: "连接中断，仅显示盘面数据",
+      reasoning: ["网络连接失败", "无法获取AI建议"],
+      actionAdvice: "请参考信号灯指示行动",
+      riskAlert: "数据仅供参考"
+    };
   }
 }
 
 function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
   return {
-    archetype: "连接中断",
-    summary: `【错误详情】：${errorMsg}`,
-    appearanceAnalysis: "无法连接服务器。",
-    annualLuckAnalysis: "无法连接服务器。",
-    historicalFigures: [],
-    strengthAnalysis: "请检查后端服务是否启动。",
-    bookAdvice: "无法连接。",
-    bookAdviceTranslation: "无法连接。",
-    careerAdvice: "暂无。",
-    healthAdvice: "暂无。",
-    numerologyAnalysis: "暂无。"
+    archetype: "连接中断", summary: errorMsg, appearanceAnalysis: "...", annualLuckAnalysis: "...",
+    historicalFigures: [], strengthAnalysis: "...", bookAdvice: "...", bookAdviceTranslation: "...",
+    careerAdvice: "...", healthAdvice: "...", numerologyAnalysis: "..."
   };
 }
