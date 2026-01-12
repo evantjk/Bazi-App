@@ -38,7 +38,6 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart, currentYear } = req.body; 
     
-    // 安全获取数据，防止 undefind 崩溃
     const daYunStr = chart?.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
     const balanceStr = chart?.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
     const lingShu = chart?.lingShu || { lifePathNumber: 0 };
@@ -47,11 +46,11 @@ app.post('/api/analyze', async (req, res) => {
 
     const prompt = `
       【角色设定】
-      你是一位精通《三命通会》、《穷通宝鉴》与《麻衣神相》的资深中文命理顾问。
+      你是一位精通《三命通会》、《穷通宝鉴》的资深命理大师。你的风格是**深度、详尽、专业**。
       
       【语言要求】
-      1. 全程使用**简体中文**。
-      2. 用词专业、优雅、温和。
+      1. **全中文**输出。
+      2. 遇到专业术语（如“伤官伤尽”）必须解释其含义。
 
       【客观事实】
       八字: ${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
@@ -61,25 +60,29 @@ app.post('/api/analyze', async (req, res) => {
       五行: ${balanceStr}
       灵数: ${lingShu.lifePathNumber}
 
-      【输出任务 (必须严格返回此JSON结构)】
+      【输出任务 (必须严格返回JSON)】
       {
         "archetype": "命格赐名(4字,如金水相涵)",
-        "summary": "30字精评(温暖、点题)",
-        "appearanceAnalysis": "容貌气质描述(基于五行/麻衣神相,100字,优美中文)",
-        "annualLuckAnalysis": "${currentYear}年流年运势(结合大运,给出事业/财运/感情建议)",
+        "summary": "30字精评(一针见血)",
+        "appearanceAnalysis": "容貌气质描述(基于五行/麻衣神相,100字)",
+        "annualLuckAnalysis": "${currentYear}年流年运势(结合大运,详细分析事业、财运、感情变化)",
+        
         "historicalFigures": [
-            {"name":"历史名人","similarity":"90%","reason":"相似点简述"}
+            {"name":"名人姓名","similarity":"85%","reason":"详细对比：为什么像？性格还是遭遇？"}
         ],
-        "strengthAnalysis": "格局深度分析(身强/身弱的利弊)",
-        "bookAdvice": "穷通宝鉴/三命通会建议(保留古文风韵)",
-        "bookAdviceTranslation": "古文的白话文翻译(通俗易懂)",
-        "careerAdvice": "事业发展建议(基于十神优势)",
-        "healthAdvice": "健康管理建议(基于五行强弱)",
+        // ⚠️ 重要：必须列出 5 位历史人物，少于 5 位视为失败！
+        
+        "strengthAnalysis": "格局深度解析。请详细分析日主强弱、喜用神选取理由、格局的高低成败。字数不少于200字。",
+        
+        "bookAdvice": "古籍建议(穷通宝鉴原文)",
+        "bookAdviceTranslation": "古文的白话文深度解析(不仅仅是翻译，要有解读)",
+        "careerAdvice": "事业发展建议(具体到行业和职能)",
+        "healthAdvice": "健康管理建议",
         "numerologyAnalysis": "灵数解读(性格与天赋)"
       }
     `;
 
-    console.log("正在请求 AI (八字)...");
+    console.log("正在请求 AI (深度八字分析)...");
     const result = await generateWithRetry(model, prompt);
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -124,7 +127,7 @@ app.post('/api/qimen', async (req, res) => {
       }
     `;
     
-    console.log("正在请求 AI (奇门)...");
+    console.log("正在请求 AI (奇门决策)...");
     const aiRes = await generateWithRetry(model, prompt);
     const text = aiRes.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);

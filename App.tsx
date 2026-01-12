@@ -55,7 +55,7 @@ export default function App() {
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null); // ✅ 新增错误状态
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   // 奇门 States
   const [qimenType, setQimenType] = useState<QimenType>('career');
@@ -107,7 +107,7 @@ export default function App() {
         setAiResult(analysis);
     } catch (error: any) {
         console.error("AI 分析失败", error);
-        setErrorMsg(error.message || "AI 服务暂时不可用"); // ✅ 显示真实错误
+        setErrorMsg(error.message || "AI 服务暂时不可用");
     } finally {
         setAiLoading(false);
     }
@@ -134,7 +134,7 @@ export default function App() {
         <div className="h-full flex flex-col p-6 overflow-y-auto">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-indigo-500 p-2 rounded-lg"><Sparkles className="text-white" size={20} /></div>
-            <div><h1 className="text-xl font-bold">命理实验室</h1><span className="text-[10px] border border-indigo-700 px-1 rounded">Pro</span></div>
+            <div><h1 className="text-xl font-bold">命理实验室</h1><span className="text-[10px] border border-indigo-700 px-1 rounded">创造者模式</span></div>
           </div>
           
           <div className="space-y-6">
@@ -144,9 +144,9 @@ export default function App() {
             </div>
             
             <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Search size={12}/> 城市定位</label>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Search size={12}/> 城市定位 (真太阳时)</label>
                 <div className="flex gap-2">
-                    <input type="text" value={citySearch} onChange={(e) => setCitySearch(e.target.value)} placeholder="如 Shanghai" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3 focus:outline-none focus:border-indigo-500 text-sm" />
+                    <input type="text" value={citySearch} onChange={(e) => setCitySearch(e.target.value)} placeholder="如 Shanghai, Beijing" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3 focus:outline-none focus:border-indigo-500 text-sm" />
                     <button onClick={handleCitySearch} disabled={isSearchingCity} className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg disabled:opacity-50">
                         {isSearchingCity ? <span className="animate-spin">⏳</span> : <Search size={16}/>}
                     </button>
@@ -157,10 +157,10 @@ export default function App() {
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">日期</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3" /></div>
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">时间</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3" /></div>
             
-            <button onClick={handleAnalyze} disabled={loading || aiLoading} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-500 disabled:opacity-50">{loading ? '排盘中...' : '八字排盘'}</button>
+            <button onClick={handleAnalyze} disabled={loading || aiLoading} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-500 disabled:opacity-50">{loading ? '排盘中...' : '开始八字排盘'}</button>
 
             <div className="pt-6 border-t border-slate-700 space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1"><Compass size={12}/> 奇门决策</h3>
+                <h3 className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1"><Compass size={12}/> 奇门决策 (无限制)</h3>
                 <select value={qimenType} onChange={e=>setQimenType(e.target.value as any)} className="w-full bg-slate-800 rounded p-2 text-sm text-white">
                     <option value="career">事业/工作</option>
                     <option value="wealth">金钱/投资</option>
@@ -209,9 +209,9 @@ export default function App() {
                                 <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs">{gender==='male'?'乾造':'坤造'}</span>
                             </div>
                             <h1 className="text-3xl font-bold text-slate-800 mb-2">
-                                <SafeText content={aiResult?.archetype || "计算中..."} />
+                                <SafeText content={aiResult?.archetype || "AI思考中..."} />
                             </h1>
-                            <p className="text-slate-600 italic"><SafeText content={aiResult?.summary || "..."} /></p>
+                            <p className="text-slate-600 italic"><SafeText content={aiResult?.summary || "正在生成命理报告..."} /></p>
                         </div>
                         <div className="flex items-center gap-4">
                              <div className="text-center">
@@ -241,6 +241,10 @@ export default function App() {
                         {activeTab === 'energy' && (
                             <div className="space-y-8">
                                 <FiveElementChart scores={result.fiveElementScore} />
+                                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                                    <h4 className="font-bold text-slate-800 mb-3 text-lg flex items-center gap-2"><Award size={20}/> 格局深度解析</h4>
+                                    <p className="text-slate-700 leading-relaxed text-justify whitespace-pre-wrap"><SafeText content={aiResult?.strengthAnalysis}/></p>
+                                </div>
                                 <div className="grid md:grid-cols-2 gap-6">
                                     <div className="bg-slate-50 p-4 rounded-xl">
                                         <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-2"><Smile size={16}/> 容貌与气质</h4>
@@ -248,11 +252,14 @@ export default function App() {
                                     </div>
                                     <div className="bg-slate-50 p-4 rounded-xl">
                                         <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-2"><User size={16}/> 相似历史人物</h4>
-                                        <ul className="space-y-2">
+                                        <ul className="space-y-3">
                                             {aiResult?.historicalFigures?.map((h, i) => (
-                                                <li key={i} className="text-sm text-slate-600 flex justify-between">
-                                                    <span className="font-bold">{h.name}</span>
-                                                    <span className="text-indigo-500 text-xs">{h.similarity}</span>
+                                                <li key={i} className="text-sm text-slate-600 bg-white p-2 rounded border border-slate-100 shadow-sm">
+                                                    <div className="flex justify-between font-bold mb-1">
+                                                        <span>{h.name}</span>
+                                                        <span className="text-indigo-500 text-xs">{h.similarity}</span>
+                                                    </div>
+                                                    <div className="text-xs opacity-80">{h.reason}</div>
                                                 </li>
                                             ))}
                                         </ul>
@@ -268,7 +275,7 @@ export default function App() {
                         {activeTab === 'luck' && (
                             <div className="space-y-4">
                                 <h4 className="font-bold text-indigo-900">2026 流年运势</h4>
-                                <p className="text-sm leading-loose text-indigo-800"><SafeText content={aiResult?.annualLuckAnalysis}/></p>
+                                <p className="text-sm leading-loose text-indigo-800 text-justify whitespace-pre-wrap"><SafeText content={aiResult?.annualLuckAnalysis}/></p>
                             </div>
                         )}
 
@@ -281,7 +288,7 @@ export default function App() {
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="font-bold mb-2">命数: {result.lingShu?.lifePathNumber}</h4>
-                                    <p className="text-sm text-slate-600 leading-relaxed"><SafeText content={aiResult?.numerologyAnalysis}/></p>
+                                    <p className="text-sm text-slate-600 leading-relaxed text-justify"><SafeText content={aiResult?.numerologyAnalysis}/></p>
                                 </div>
                             </div>
                         )}
@@ -304,7 +311,7 @@ export default function App() {
                             </div>
                         )}
 
-                        {activeTab === 'career' && <p className="text-sm leading-loose"><SafeText content={aiResult?.careerAdvice}/></p>}
+                        {activeTab === 'career' && <p className="text-sm leading-loose text-justify"><SafeText content={aiResult?.careerAdvice}/></p>}
                         
                         {activeTab === 'qimen' && (
                             <div className="text-center text-slate-400 py-10">

@@ -6,7 +6,11 @@ export type Polarity = '+' | '-';
 export type Gender = 'male' | 'female';
 
 export interface FiveElementScore {
-  wood: number; fire: number; earth: number; gold: number; water: number;
+  wood: number; 
+  fire: number; 
+  earth: number; 
+  gold: number; 
+  water: number;
 }
 
 export interface TenGods {
@@ -115,6 +119,8 @@ const BRANCH_DETAILS: Record<string, { element: ElementType; zodiac: string; hid
   '亥': { element: 'water', zodiac: '猪', hidden: ['壬', '甲'] },
 };
 
+// --- Helper Utilities ---
+
 export function parseLongitude(input: string): number {
   if (!input) return 120;
   const directNum = Number(input.trim());
@@ -150,22 +156,24 @@ export function getAnnualRelations(chart: BaziChart, currentYearBranch: string):
     return relations;
 }
 
-// ✅ 修复：灵数计算逻辑 (添加类型注解，解决 parseInt 报错)
 function calculateLingShu(date: Date): LingShu {
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
     const day = date.getDate();
     
+    // 1. 提取所有数字 (YYYYMMDD)
     const dateStr = `${year}${month < 10 ? '0'+month : month}${day < 10 ? '0'+day : day}`;
     const digits = dateStr.split('').map(Number);
     
+    // 2. 计算命数 - 递归相加
     let sum = digits.reduce((a, b) => a + b, 0);
     while (sum > 9) {
-        // ✅ 显式指定 a 为 number, b 为 string，彻底消除 TS 歧义
+        // ✅ 显式指定类型，防止 TS 报错
         sum = sum.toString().split('').reduce((a: number, b: string) => a + parseInt(b), 0);
     }
     const lifePathNumber = sum;
 
+    // 3. 计算九宫格分布
     const grid: Record<number, number> = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0};
     const missingNumbers: number[] = [];
     
@@ -180,7 +188,7 @@ function calculateLingShu(date: Date): LingShu {
     return { lifePathNumber, grid, missingNumbers };
 }
 
-// --- Main Logic ---
+// --- Main Calculation Logic ---
 
 export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gender): BaziChart {
   const longitude = parseLongitude(longitudeStr);
@@ -222,9 +230,9 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
       startAge: dy.getStartAge(),
       endAge: dy.getEndAge(),
       year: dy.getStartYear(),
+      ganZhi: dy.getGanZhi(),
       startYear: dy.getStartYear(),
-      endYear: dy.getEndYear(),
-      ganZhi: dy.getGanZhi()
+      endYear: dy.getEndYear()
     });
   }
 
@@ -288,15 +296,19 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
   };
 }
 
-// --- Helper Functions (保持不变) ---
+// --- Expanded Helper Functions ---
+
 function createPillar(stem: string, branch: string, dayMaster: string, kw: string[], yZhi: string, dZhi: string, mZhi: string): Pillar {
   const sDetail = STEM_DETAILS[stem];
   const bDetail = BRANCH_DETAILS[branch];
   const naYin = NA_YIN_MAP[stem + branch] || '';
   const dmDetail = STEM_DETAILS[dayMaster];
   const shenShaList = getShenSha(stem, branch, dayMaster, dZhi, yZhi, mZhi);
+  
   return {
-    stem, branch, zodiac: bDetail.zodiac,
+    stem, 
+    branch, 
+    zodiac: bDetail.zodiac,
     elementStem: sDetail.element,
     elementBranch: bDetail.element,
     tenGodStem: calculateTenGod(dmDetail, sDetail),
@@ -305,22 +317,44 @@ function createPillar(stem: string, branch: string, dayMaster: string, kw: strin
       main: calculateTenGod(dmDetail, STEM_DETAILS[bDetail.hidden[0]]),
       hidden: bDetail.hidden.slice(1).map(h => calculateTenGod(dmDetail, STEM_DETAILS[h]))
     },
-    naYin, shenSha: shenShaList, kongWang: kw.includes(branch)
+    naYin, 
+    shenSha: shenShaList, 
+    kongWang: kw.includes(branch)
   };
 }
 
 function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: string, yearBranch: string, monthBranch: string): string[] {
     const list: string[] = [];
+    
+    // 天乙贵人
     const tianYiMap: Record<string, string[]> = {
-        '甲': ['丑', '未'], '戊': ['丑', '未'], '庚': ['丑', '未'], '乙': ['子', '申'], '己': ['子', '申'], '丙': ['亥', '酉'], '丁': ['亥', '酉'], '壬': ['巳', '卯'], '癸': ['巳', '卯'], '辛': ['午', '寅']
+        '甲': ['丑', '未'], '戊': ['丑', '未'], '庚': ['丑', '未'], 
+        '乙': ['子', '申'], '己': ['子', '申'], 
+        '丙': ['亥', '酉'], '丁': ['亥', '酉'], 
+        '壬': ['巳', '卯'], '癸': ['巳', '卯'], 
+        '辛': ['午', '寅']
     };
     if (tianYiMap[dayStem]?.includes(branch)) list.push('天乙贵人');
-    const wenChangMap: Record<string, string> = { '甲': '巳', '乙': '午', '丙': '申', '戊': '申', '丁': '酉', '己': '酉', '庚': '亥', '辛': '子', '壬': '寅', '癸': '卯' };
+
+    // 文昌贵人
+    const wenChangMap: Record<string, string> = { 
+        '甲': '巳', '乙': '午', '丙': '申', '戊': '申', '丁': '酉', 
+        '己': '酉', '庚': '亥', '辛': '子', '壬': '寅', '癸': '卯' 
+    };
     if (wenChangMap[dayStem] === branch) list.push('文昌贵人');
+
+    // 羊刃
     const yangRenMap: Record<string, string> = { '甲': '卯', '丙': '午', '戊': '午', '庚': '酉', '壬': '子' };
     if (yangRenMap[dayStem] === branch) list.push('羊刃');
-    const luMap: Record<string, string> = { '甲': '寅', '乙': '卯', '丙': '巳', '丁': '午', '戊': '巳', '己': '午', '庚': '申', '辛': '酉', '壬': '亥', '癸': '子' };
+
+    // 禄神
+    const luMap: Record<string, string> = { 
+        '甲': '寅', '乙': '卯', '丙': '巳', '丁': '午', '戊': '巳', 
+        '己': '午', '庚': '申', '辛': '酉', '壬': '亥', '癸': '子' 
+    };
     if (luMap[dayStem] === branch) list.push('禄神');
+
+    // 驿马 (申子辰马在寅, 寅午戌马在申, 巳酉丑马在亥, 亥卯未马在巳)
     const isYiMa = (z: string) => {
         if ('申子辰'.includes(z) && branch === '寅') return true;
         if ('寅午戌'.includes(z) && branch === '申') return true;
@@ -329,6 +363,8 @@ function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: st
         return false;
     };
     if (isYiMa(yearBranch) || isYiMa(dayBranch)) list.push('驿马');
+
+    // 桃花 (申子辰鸡叫, 寅午戌兔跑, 巳酉丑马儿跑, 亥卯未鼠儿跳)
     const isTaoHua = (z: string) => {
         if ('申子辰'.includes(z) && branch === '酉') return true;
         if ('寅午戌'.includes(z) && branch === '卯') return true;
@@ -337,6 +373,8 @@ function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: st
         return false;
     };
     if (isTaoHua(yearBranch) || isTaoHua(dayBranch)) list.push('桃花');
+
+    // 华盖
     const isHuaGai = (z: string) => {
         if ('申子辰'.includes(z) && branch === '辰') return true;
         if ('寅午戌'.includes(z) && branch === '戌') return true;
@@ -345,9 +383,13 @@ function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: st
         return false;
     };
     if (isHuaGai(yearBranch) || isHuaGai(dayBranch)) list.push('华盖');
+
+    // 魁罡
     if (stem && branch) {
         if (['戊戌', '庚辰', '庚戌', '壬辰'].includes(stem + branch) && dayStem === stem && dayBranch === branch) list.push('魁罡');
     }
+
+    // 将星
     const isJiangXing = (z: string) => {
         if ('申子辰'.includes(z) && branch === '子') return true;
         if ('寅午戌'.includes(z) && branch === '午') return true;
@@ -356,8 +398,14 @@ function getShenSha(stem: string, branch: string, dayStem: string, dayBranch: st
         return false;
     };
     if (isJiangXing(yearBranch) || isJiangXing(dayBranch)) list.push('将星');
-    const jinYuMap: Record<string, string> = { '甲': '辰', '乙': '巳', '丙': '未', '丁': '申', '戊': '未', '己': '申', '庚': '戌', '辛': '亥', '壬': '丑', '癸': '寅' };
+
+    // 金舆
+    const jinYuMap: Record<string, string> = { 
+        '甲': '辰', '乙': '巳', '丙': '未', '丁': '申', '戊': '未', 
+        '己': '申', '庚': '戌', '辛': '亥', '壬': '丑', '癸': '寅' 
+    };
     if (jinYuMap[dayStem] === branch) list.push('金舆');
+
     return list;
 }
 
@@ -367,18 +415,20 @@ function getKongWang(dStem: string, dBranch: string): string[] {
     const sIdx = stems.indexOf(dStem);
     const bIdx = branches.indexOf(dBranch);
     const diff = bIdx - sIdx;
-    if (diff === 2 || diff === -10) return ['戌', '亥']; 
-    if (diff === 4 || diff === -8) return ['申', '酉']; 
-    if (diff === 6 || diff === -6) return ['午', '未']; 
-    if (diff === 8 || diff === -4) return ['辰', '巳']; 
-    if (diff === 10 || diff === -2) return ['寅', '卯']; 
-    if (diff === 0) return ['子', '丑']; 
+    
+    if (diff === 2 || diff === -10) return ['戌', '亥'];
+    if (diff === 4 || diff === -8) return ['申', '酉'];
+    if (diff === 6 || diff === -6) return ['午', '未'];
+    if (diff === 8 || diff === -4) return ['辰', '巳'];
+    if (diff === 10 || diff === -2) return ['寅', '卯'];
+    if (diff === 0) return ['子', '丑'];
     return [];
 }
 
 function calculateTenGod(dm: { element: ElementType, polarity: Polarity }, target: { element: ElementType, polarity: Polarity }): string {
   if (!target) return '';
   const isSamePol = dm.polarity === target.polarity;
+  
   if (dm.element === target.element) return isSamePol ? '比肩' : '劫财';
   if (getGeneratingElement(target.element) === dm.element) return isSamePol ? '食神' : '伤官';
   if (getGeneratingElement(dm.element) === target.element) return isSamePol ? '偏印' : '正印';
@@ -392,6 +442,7 @@ function calculateScores(y: Pillar, m: Pillar, d: Pillar, h: Pillar): FiveElemen
   [y, m, d, h].forEach((p, idx) => {
     const mult = idx === 1 ? 1.2 : 1.0; 
     scores[p.elementStem] += 5;
+    
     const hidden = p.hiddenStems;
     if (hidden[0]) scores[STEM_DETAILS[hidden[0]].element] += (5 * mult);
     if (hidden[1]) scores[STEM_DETAILS[hidden[1]].element] += (3 * mult);
@@ -406,10 +457,12 @@ function calculateStrengthAdvanced(scores: FiveElementScore, dmEl: ElementType, 
     const selfEnergy = scores[dmEl] + scores[resourceEl];
     const totalEnergy = Object.values(scores).reduce((a,b) => a+b, 0);
     const percentage = selfEnergy / totalEnergy;
+    
     let strength = '身弱';
     if (isDeLing && percentage > 0.4) strength = '身强'; 
     else if (!isDeLing && percentage > 0.55) strength = '身强'; 
     else if (isDeLing && percentage < 0.3) strength = '身弱'; 
+    
     return { isStrong: strength === '身强', desc: strength };
 }
 
