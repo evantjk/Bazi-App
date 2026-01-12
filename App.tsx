@@ -47,28 +47,26 @@ export default function App() {
   const [time, setTime] = useState<string>("12:00");
   const [longitude, setLongitude] = useState<string>("120");
   const [gender, setGender] = useState<Gender>('male');
-  
-  // ✅ 城市定位
   const [citySearch, setCitySearch] = useState("");
   const [isSearchingCity, setIsSearchingCity] = useState(false);
 
-  // 八字 Result
+  // Result States
   const [result, setResult] = useState<BaziChart | null>(null);
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   
-  // 奇门 Input & Result
+  // 奇门 States
   const [qimenType, setQimenType] = useState<QimenType>('career');
   const [qimenContext, setQimenContext] = useState("");
   const [qimenResult, setQimenResult] = useState<QimenResult | null>(null);
   const [qimenAI, setQimenAI] = useState<QimenAIResult | null>(null);
   const [qimenLoading, setQimenLoading] = useState(false);
 
+  // Tabs (✅ 确保 'ancient' 在这里)
   const [activeTab, setActiveTab] = useState<'energy' | 'luck' | 'numerology' | 'qimen' | 'ancient' | 'career'>('energy');
   const [isTranslated, setIsTranslated] = useState(false);
 
-  // 🌍 城市自动定位功能
   const handleCitySearch = async () => {
     if(!citySearch) return;
     setIsSearchingCity(true);
@@ -94,7 +92,7 @@ export default function App() {
     try {
         const chart = calculateBazi(new Date(`${date}T${time}`), longitude, gender);
         setResult(chart);
-        setLoading(false); // 本地计算完成
+        setLoading(false); 
         const analysis = await analyzeBaziWithAI(chart, 2026);
         setAiResult(analysis);
     } catch (error) {
@@ -104,19 +102,14 @@ export default function App() {
     }
   };
 
-  // ✅ 奇门分析 (无限制版)
   const handleQimenAnalyze = async () => {
     setQimenLoading(true);
-    // 1. 本地规则引擎
     const qResult = calculateQimen(qimenType, new Date());
     setQimenResult(qResult);
-    
-    // 2. AI 解读 (无锁)
     try {
         const aiData = await analyzeQimenWithAI(qimenType, qimenContext, qResult);
         setQimenAI(aiData);
     } catch(e) { console.error(e); }
-    
     setQimenLoading(false);
     setActiveTab('qimen'); 
   };
@@ -130,7 +123,7 @@ export default function App() {
         <div className="h-full flex flex-col p-6 overflow-y-auto">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-indigo-500 p-2 rounded-lg"><Sparkles className="text-white" size={20} /></div>
-            <div><h1 className="text-xl font-bold">命理实验室</h1><span className="text-[10px] border border-indigo-700 px-1 rounded">Creator Mode</span></div>
+            <div><h1 className="text-xl font-bold">命理实验室</h1><span className="text-[10px] border border-indigo-700 px-1 rounded">Pro</span></div>
           </div>
           
           <div className="space-y-6">
@@ -139,11 +132,10 @@ export default function App() {
                 <div className="flex bg-slate-800 rounded-lg p-1"><button onClick={() => setGender('male')} className={`flex-1 py-1.5 rounded ${gender==='male'?'bg-indigo-600':''}`}>男</button><button onClick={() => setGender('female')} className={`flex-1 py-1.5 rounded ${gender==='female'?'bg-pink-600':''}`}>女</button></div>
             </div>
             
-            {/* 🌍 城市定位输入 */}
             <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Search size={12}/> 城市定位 (真太阳时)</label>
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Search size={12}/> 城市定位</label>
                 <div className="flex gap-2">
-                    <input type="text" value={citySearch} onChange={(e) => setCitySearch(e.target.value)} placeholder="如 Shanghai, Taipei" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3 focus:outline-none focus:border-indigo-500 text-sm" />
+                    <input type="text" value={citySearch} onChange={(e) => setCitySearch(e.target.value)} placeholder="如 Shanghai" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3 focus:outline-none focus:border-indigo-500 text-sm" />
                     <button onClick={handleCitySearch} disabled={isSearchingCity} className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg disabled:opacity-50">
                         {isSearchingCity ? <span className="animate-spin">⏳</span> : <Search size={16}/>}
                     </button>
@@ -156,11 +148,14 @@ export default function App() {
             
             <button onClick={handleAnalyze} disabled={loading || aiLoading} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-500 disabled:opacity-50">{loading ? '排盘中...' : '八字排盘'}</button>
 
-            {/* 奇门板块 */}
             <div className="pt-6 border-t border-slate-700 space-y-4">
-                <h3 className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1"><Compass size={12}/> 奇门决策 (无限制)</h3>
+                <h3 className="text-xs font-bold text-slate-400 uppercase flex items-center gap-1"><Compass size={12}/> 奇门决策</h3>
                 <select value={qimenType} onChange={e=>setQimenType(e.target.value as any)} className="w-full bg-slate-800 rounded p-2 text-sm text-white">
-                    {Object.entries(QUESTION_TYPES).map(([k,v]) => <option key={k} value={k}>{v.split(' ')[0]}</option>)}
+                    <option value="career">事业/工作</option>
+                    <option value="wealth">金钱/投资</option>
+                    <option value="relationship">感情/人际</option>
+                    <option value="travel">出行/行动</option>
+                    <option value="study">学业/考试</option>
                 </select>
                 <button onClick={handleQimenAnalyze} disabled={qimenLoading} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-emerald-500 disabled:opacity-50">
                     {qimenLoading ? '起局中...' : '立即起局'}
@@ -175,42 +170,12 @@ export default function App() {
         {!result && !loading && !qimenResult && (
              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-4 text-center">
                 <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4"><Bot size={40} className="text-slate-300" /></div>
-                <h2 className="text-xl font-semibold text-slate-600 mb-2">Creator Mode Ready</h2>
-                <p>请输入信息开始排盘，或使用左侧奇门进行即时决策。</p>
+                <h2 className="text-xl font-semibold text-slate-600 mb-2">系统就绪</h2>
+                <p>请在左侧输入信息进行排盘或决策。</p>
              </div>
         )}
 
         <div className="max-w-6xl mx-auto p-6 lg:p-10 space-y-8 animate-fade-in">
-            {/* 奇门结果展示 */}
-            {qimenResult && (activeTab === 'qimen' || !result) && (
-                <div className="space-y-6">
-                    <div className={`rounded-2xl p-8 border-2 text-center relative overflow-hidden ${
-                        qimenResult.signal === 'green' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-                        qimenResult.signal === 'yellow' ? 'bg-amber-50 border-amber-200 text-amber-800' :
-                        'bg-red-50 border-red-200 text-red-800'
-                    }`}>
-                        <div className="absolute top-4 right-4 text-xs opacity-50">有效期至 {qimenResult.validUntil}</div>
-                        {qimenResult.signal === 'green' && <CheckCircle size={64} className="mx-auto mb-4 text-emerald-500"/>}
-                        {qimenResult.signal === 'yellow' && <AlertTriangle size={64} className="mx-auto mb-4 text-amber-500"/>}
-                        {qimenResult.signal === 'red' && <XCircle size={64} className="mx-auto mb-4 text-red-500"/>}
-                        
-                        <h2 className="text-3xl font-bold mb-2">
-                            {qimenResult.signal === 'green' ? '可行动 (顺势)' : qimenResult.signal === 'yellow' ? '需观察 (调整)' : '不建议 (逆势)'}
-                        </h2>
-                        <p className="opacity-80 font-serif mb-4">{qimenResult.summary}</p>
-                        
-                        {qimenAI ? (
-                            <div className="bg-white/60 p-4 rounded-xl text-left max-w-2xl mx-auto mt-6">
-                                <p className="font-bold mb-2">💡 建议：</p>
-                                <p className="text-sm leading-relaxed mb-4"><SafeText content={qimenAI.actionAdvice}/></p>
-                                <p className="font-bold mb-2">🛡️ 风险：</p>
-                                <p className="text-sm leading-relaxed"><SafeText content={qimenAI.riskAlert}/></p>
-                            </div>
-                        ) : <div className="animate-pulse text-sm">AI 正在解读策略...</div>}
-                    </div>
-                </div>
-            )}
-
             {/* 八字结果展示 */}
             {result && (
                 <>
@@ -240,35 +205,100 @@ export default function App() {
                         <PillarCard title="时" pillar={result.hour} />
                     </div>
 
-                    {/* Tabs */}
+                    {/* Tabs (✅ 找回 'ancient' 等 Tab) */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex overflow-x-auto">
-                        {['energy', 'luck', 'numerology', 'career', 'qimen'].map(t => (
-                            <button key={t} onClick={()=>setActiveTab(t as any)} className={`flex-1 py-3 text-sm font-bold capitalize ${activeTab===t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}>
-                                {t === 'qimen' ? '奇门决策' : t === 'numerology' ? '灵数' : t}
+                        {['energy', 'luck', 'numerology', 'career', 'ancient', 'qimen'].map(t => (
+                            <button key={t} onClick={()=>setActiveTab(t as any)} className={`flex-1 py-3 text-sm font-bold capitalize whitespace-nowrap px-4 ${activeTab===t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}>
+                                {t === 'qimen' ? '奇门决策' : t === 'numerology' ? '灵数' : t === 'ancient' ? '古籍' : t === 'energy' ? '格局' : t}
                             </button>
                         ))}
                     </div>
 
                     <div className="p-6 bg-white rounded-2xl border border-slate-100 min-h-[300px]">
-                        {activeTab === 'energy' && <FiveElementChart scores={result.fiveElementScore} />}
-                        {activeTab === 'luck' && <p className="text-sm leading-loose"><SafeText content={aiResult?.annualLuckAnalysis}/></p>}
+                        {/* ✅ 修复：在 Energy Tab 中加回容貌和历史人物 */}
+                        {activeTab === 'energy' && (
+                            <div className="space-y-8">
+                                <FiveElementChart scores={result.fiveElementScore} />
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    <div className="bg-slate-50 p-4 rounded-xl">
+                                        <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-2"><Smile size={16}/> 容貌与气质</h4>
+                                        <p className="text-sm text-slate-600 leading-relaxed"><SafeText content={aiResult?.appearanceAnalysis}/></p>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-xl">
+                                        <h4 className="font-bold text-slate-700 mb-2 flex items-center gap-2"><User size={16}/> 相似历史人物</h4>
+                                        <ul className="space-y-2">
+                                            {aiResult?.historicalFigures?.map((h, i) => (
+                                                <li key={i} className="text-sm text-slate-600 flex justify-between">
+                                                    <span className="font-bold">{h.name}</span>
+                                                    <span className="text-indigo-500 text-xs">{h.similarity}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                    <h4 className="text-emerald-800 font-bold mb-2 flex items-center gap-2"><Activity size={16}/> 健康建议</h4>
+                                    <p className="text-emerald-700 text-sm"><SafeText content={aiResult?.healthAdvice}/></p>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'luck' && (
+                            <div className="space-y-4">
+                                <h4 className="font-bold text-indigo-900">2026 流年运势</h4>
+                                <p className="text-sm leading-loose text-indigo-800"><SafeText content={aiResult?.annualLuckAnalysis}/></p>
+                            </div>
+                        )}
+
                         {activeTab === 'numerology' && (
-                            <div className="flex gap-8">
-                                <div className="grid grid-cols-3 gap-1 w-32 h-32 bg-slate-100 p-1 rounded">
+                            <div className="flex gap-8 flex-col md:flex-row">
+                                <div className="grid grid-cols-3 gap-1 w-32 h-32 bg-slate-100 p-1 rounded flex-shrink-0">
                                     {[4,9,2,3,5,7,8,1,6].map(n => (
                                         <div key={n} className={`flex items-center justify-center rounded ${result.lingShu?.grid[n] ? 'bg-indigo-500 text-white' : 'text-slate-300'}`}>{n}</div>
                                     ))}
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="font-bold mb-2">命数: {result.lingShu?.lifePathNumber}</h4>
-                                    <p className="text-sm text-slate-600"><SafeText content={aiResult?.numerologyAnalysis}/></p>
+                                    <p className="text-sm text-slate-600 leading-relaxed"><SafeText content={aiResult?.numerologyAnalysis}/></p>
                                 </div>
                             </div>
                         )}
+
+                        {/* ✅ 修复：加回 Ancient 古籍 Tab */}
+                        {activeTab === 'ancient' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center border-b pb-2">
+                                    <h4 className="font-bold text-amber-800">📜 穷通宝鉴 / 三命通会</h4>
+                                    <button onClick={()=>setIsTranslated(!isTranslated)} className="text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded-full hover:bg-amber-200 transition">
+                                        {isTranslated ? "查看原文" : "查看白话翻译"}
+                                    </button>
+                                </div>
+                                <div className="bg-amber-50 p-6 rounded-xl border border-amber-100 min-h-[150px]">
+                                    {isTranslated ? (
+                                        <p className="text-amber-900 leading-8 text-sm"><SafeText content={aiResult?.bookAdviceTranslation}/></p>
+                                    ) : (
+                                        <p className="text-amber-900 font-serif text-lg leading-8"><SafeText content={aiResult?.bookAdvice}/></p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {activeTab === 'career' && <p className="text-sm leading-loose"><SafeText content={aiResult?.careerAdvice}/></p>}
+                        
                         {activeTab === 'qimen' && (
                             <div className="text-center text-slate-400 py-10">
-                                <p>请在左侧侧边栏使用奇门决策功能</p>
+                                {qimenResult ? (
+                                    <div className={`rounded-xl p-6 border-2 text-left ${qimenResult.signal==='green'?'bg-emerald-50 border-emerald-200':qimenResult.signal==='yellow'?'bg-amber-50 border-amber-200':'bg-red-50 border-red-200'}`}>
+                                        <h3 className="text-2xl font-bold mb-2">{qimenResult.signal==='green'?'🟢 可行动':qimenResult.signal==='yellow'?'🟡 需观察':'🔴 不建议'}</h3>
+                                        <p className="font-serif opacity-80 mb-4">{qimenResult.summary}</p>
+                                        <div className="bg-white/60 p-4 rounded-lg">
+                                            <p className="font-bold text-sm mb-1">💡 建议：</p>
+                                            <p className="text-sm mb-2"><SafeText content={qimenAI?.actionAdvice}/></p>
+                                            <p className="font-bold text-sm mb-1">🛡️ 风险：</p>
+                                            <p className="text-sm"><SafeText content={qimenAI?.riskAlert}/></p>
+                                        </div>
+                                    </div>
+                                ) : <p>请在左侧侧边栏使用奇门决策功能</p>}
                             </div>
                         )}
                     </div>

@@ -38,7 +38,7 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart, currentYear } = req.body; 
     
-    // 保护性获取数据
+    // 数据准备
     const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
     const balanceStr = chart.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
     const lingShu = chart.lingShu || { lifePathNumber: 0 };
@@ -46,28 +46,37 @@ app.post('/api/analyze', async (req, res) => {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
-      角色:资深命理师. 任务:八字及${currentYear}分析.
-      [客观事实]
-      八字:${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
-      日主:${chart.dayMaster} 格局:${chart.strength}
-      大运:${daYunStr}
-      评分:${chart.destinyScore} (这是硬指标)
-      五行诊断:${balanceStr}
-      灵数命数:${lingShu.lifePathNumber}
+      【角色设定】
+      你是一位精通《三命通会》、《穷通宝鉴》与《麻衣神相》的资深中文命理顾问。
+      
+      【语言要求】
+      1. 全程使用**简体中文**。
+      2. 用词专业、优雅、温和，严禁中英文夹杂。
+      3. 风格：理性分析，拒绝封建迷信恐吓。
 
-      [输出JSON]
+      【客观事实】
+      八字: ${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
+      日主: ${chart.dayMaster} 格局: ${chart.strength}
+      大运: ${daYunStr}
+      评分: ${chart.destinyScore} (这是硬指标)
+      五行: ${balanceStr}
+      灵数: ${lingShu.lifePathNumber}
+
+      【输出任务 (必须严格返回此JSON结构)】
       {
-        "archetype": "命格赐名",
-        "summary": "精评",
-        "appearanceAnalysis": "容貌",
-        "annualLuckAnalysis": "流年运势",
-        "historicalFigures": [{"name":"名人","similarity":"90%","reason":"理由"}](5个),
-        "strengthAnalysis": "格局",
-        "bookAdvice": "古文",
-        "bookAdviceTranslation": "白话",
-        "careerAdvice": "事业",
-        "healthAdvice": "健康",
-        "numerologyAnalysis": "灵数解读"
+        "archetype": "命格赐名(4字,如金水相涵)",
+        "summary": "30字精评(温暖、点题)",
+        "appearanceAnalysis": "容貌气质描述(基于五行/麻衣神相,100字,优美中文)",
+        "annualLuckAnalysis": "${currentYear}年流年运势(结合大运,给出事业/财运/感情建议)",
+        "historicalFigures": [
+            {"name":"历史名人","similarity":"90%","reason":"相似点简述"}
+        ],
+        "strengthAnalysis": "格局深度分析(身强/身弱的利弊)",
+        "bookAdvice": "穷通宝鉴/三命通会建议(保留古文风韵)",
+        "bookAdviceTranslation": "古文的白话文翻译(通俗易懂)",
+        "careerAdvice": "事业发展建议(基于十神优势)",
+        "healthAdvice": "健康管理建议(基于五行强弱)",
+        "numerologyAnalysis": "灵数解读(性格与天赋)"
       }
     `;
 
@@ -82,7 +91,7 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// ✅ 新增：奇门决策接口
+// 奇门决策接口
 app.post('/api/qimen', async (req, res) => {
   try {
     const { type, context, result } = req.body; 
@@ -93,6 +102,7 @@ app.post('/api/qimen', async (req, res) => {
 
     const prompt = `
       角色：奇门遁甲决策顾问。
+      语言：**简体中文**。
       任务：根据盘面信号给出直截了当的建议。
       
       问题类型：${type}

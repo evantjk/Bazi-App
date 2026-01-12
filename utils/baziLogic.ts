@@ -150,7 +150,7 @@ export function getAnnualRelations(chart: BaziChart, currentYearBranch: string):
     return relations;
 }
 
-// ✅ 修复：灵数计算逻辑
+// ✅ 修复：灵数计算逻辑 (解决 parseInt 报错)
 function calculateLingShu(date: Date): LingShu {
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
@@ -163,8 +163,7 @@ function calculateLingShu(date: Date): LingShu {
     // 2. 计算命数 (Life Path Number) - 递归相加直到个位数
     let sum = digits.reduce((a, b) => a + b, 0);
     while (sum > 9) {
-        // ❌ 错误写法: parseInt(a) + parseInt(b) (a已经是数字了)
-        // ✅ 正确写法: a + parseInt(b)
+        // 修复：确保所有操作数都是 number
         sum = sum.toString().split('').reduce((a, b) => a + parseInt(b), 0);
     }
     const lifePathNumber = sum;
@@ -173,12 +172,10 @@ function calculateLingShu(date: Date): LingShu {
     const grid: Record<number, number> = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0};
     const missingNumbers: number[] = [];
     
-    // 统计出生日期里的数字
     digits.forEach(d => {
         if (d >= 1 && d <= 9) grid[d]++;
     });
 
-    // 统计缺失的数字
     for (let i = 1; i <= 9; i++) {
         if (grid[i] === 0) missingNumbers.push(i);
     }
