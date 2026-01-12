@@ -37,11 +37,10 @@ export interface DaYun {
   endYear: number;
 }
 
-// ✅ 新增：灵数接口
 export interface LingShu {
-  lifePathNumber: number; // 命数 (1-9)
-  grid: Record<number, number>; // 九宫格分布 {1: 2, 2: 0, ...} 记录每个数字出现的次数
-  missingNumbers: number[]; // 缺失的数字
+  lifePathNumber: number; 
+  grid: Record<number, number>; 
+  missingNumbers: number[]; 
 }
 
 export interface BaziChart {
@@ -67,7 +66,7 @@ export interface BaziChart {
   strongestElement: ElementType;
   weakestElement: ElementType; 
   balanceNote: string[];
-  lingShu: LingShu; // ✅ 新增：灵数数据
+  lingShu: LingShu; 
 }
 
 // --- Constants ---
@@ -151,7 +150,7 @@ export function getAnnualRelations(chart: BaziChart, currentYearBranch: string):
     return relations;
 }
 
-// ✅ 新增：计算灵数逻辑
+// ✅ 修复：灵数计算逻辑
 function calculateLingShu(date: Date): LingShu {
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
@@ -164,7 +163,9 @@ function calculateLingShu(date: Date): LingShu {
     // 2. 计算命数 (Life Path Number) - 递归相加直到个位数
     let sum = digits.reduce((a, b) => a + b, 0);
     while (sum > 9) {
-        sum = sum.toString().split('').reduce((a, b) => parseInt(a) + parseInt(b), 0);
+        // ❌ 错误写法: parseInt(a) + parseInt(b) (a已经是数字了)
+        // ✅ 正确写法: a + parseInt(b)
+        sum = sum.toString().split('').reduce((a, b) => a + parseInt(b), 0);
     }
     const lifePathNumber = sum;
 
@@ -268,7 +269,6 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
   const eotDisplay = eotMinutes > 0 ? `+${eotMinutes.toFixed(1)}m` : `${eotMinutes.toFixed(1)}m`;
   const longOffsetDisplay = `${longOffsetMinutes.toFixed(1)}m`;
 
-  // ✅ 计算灵数
   const lingShu = calculateLingShu(inputDate);
 
   return {
@@ -290,7 +290,7 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
     strongestElement: strongestEl,
     weakestElement: weakestEl,
     balanceNote,
-    lingShu // ✅ 导出
+    lingShu 
   };
 }
 
