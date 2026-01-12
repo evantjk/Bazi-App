@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+// 👇 引入 dotenv，这行代码会自动读取 .env 文件里的内容
+import 'dotenv/config'; 
 
 const app = express();
 const port = 3000;
@@ -8,8 +10,14 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ 您的 API Key
-const API_KEY = "AIzaSyCbumuVlE4jvsOD2PewUL5NcXW4IUIe1_M";
+// ✅ 安全修改：从环境变量中读取 Key
+// 如果没读到，就报错提醒
+const API_KEY = process.env.GEMINI_API_KEY;
+
+if (!API_KEY) {
+  console.error("❌ 错误：未找到 API Key。请确保项目根目录下有 .env 文件，并且里面写了 GEMINI_API_KEY=...");
+  process.exit(1); // 没 Key 跑不起来，直接退出
+}
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
@@ -17,7 +25,6 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart, currentYear } = req.body; 
     
-    // 🛠️ 保护性获取大运，防止崩溃
     const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(', ') : "暂无大运数据";
 
     const model = genAI.getGenerativeModel({ 
@@ -69,10 +76,7 @@ app.post('/api/analyze', async (req, res) => {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
-    // console.log("AI 原始返回:", text); // 调试用
 
-    // 🧹 核心修复：使用正则提取第一个 "{" 和最后一个 "}" 之间的内容
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     
     if (!jsonMatch) {
