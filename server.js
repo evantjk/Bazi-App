@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import OpenAI from 'openai'; // Changed from @google/generative-ai
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import 'dotenv/config';
 
 const app = express();
@@ -9,98 +9,98 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// Check for API Key
-const API_KEY = process.env.DEEPSEEK_API_KEY;
+// 读取 Google Key
+const API_KEY = process.env.GEMINI_API_KEY;
 
 if (!API_KEY) {
-  console.error("❌ Fatal Error: DEEPSEEK_API_KEY not found in .env file.");
+  console.error("❌ 致命错误：未找到 GEMINI_API_KEY。请检查 .env 文件。");
   process.exit(1);
 }
 
-// Configure DeepSeek Client (using OpenAI SDK)
-const openai = new OpenAI({
-  baseURL: 'https://api.deepseek.com', // DeepSeek Endpoint
-  apiKey: API_KEY
-});
+const genAI = new GoogleGenerativeAI(API_KEY);
+
+// 👇 自动重试机制 (解决 Google 503 服务器繁忙问题)
+async function generateWithRetry(model, prompt, retries = 3, delay = 2000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await model.generateContent(prompt);
+    } catch (error) {
+      const isOverloaded = error.message.includes('503') || error.message.includes('overloaded');
+      if (isOverloaded && i < retries - 1) {
+        console.warn(`⚠️ Google 服务器繁忙 (503)，正在第 ${i + 1} 次重试...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; 
+      } else {
+        throw error;
+      }
+    }
+  }
+}
 
 app.post('/api/analyze', async (req, res) => {
   try {
     const { chart, currentYear } = req.body; 
     
+    // 保护性获取大运
     const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
 
-    console.log(`DeepSeek (V3.2) Analysis Requested for ${currentYear}...`);
+    // 使用 Gemini 2.5 Flash (如果觉得慢或报错多，可改为 "gemini-1.5-flash")
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash", 
+      generationConfig: {
+        temperature: 0.1, 
+        topP: 0.8,
+        topK: 40,
+      }
+    });
 
-    // Prepare the system prompt
-    const systemPrompt = `
-      You are a profound master of Bazi (Four Pillars of Destiny), proficient in "Qiong Tong Bao Jian", "San Ming Tong Hui", and "Ma Yi Shen Xiang".
-      Your task is to analyze the user's Bazi chart and provide a structured JSON response.
+    // ⚡️ 极简 Prompt (省 Token)
+    const prompt = `
+      角色:资深命理师. 任务:八字及${currentYear}流年分析.
       
-      Output ONLY valid JSON. No markdown formatting, no code blocks, no intro/outro text.
-    `;
+      [信息]
+      八字:${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
+      日主:${chart.dayMaster}(${chart.dayMasterElement}) 格局:${chart.strength}
+      大运:${daYunStr}
+      流年:${currentYear}
 
-    // Prepare the user data prompt
-    const userPrompt = `
-      [Bazi Chart Information]
-      Eight Characters: ${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
-      Day Master: ${chart.dayMaster} (${chart.dayMasterElement})
-      Strength: ${chart.strength}
-      Major Cycles (Da Yun): ${daYunStr}
-      Current Annual Pillar (Liu Nian): ${currentYear} (Bing Wu Year)
-
-      [Analysis Requirements]
-      Return a JSON object with these exact keys:
+      [要求]
+      输出纯JSON,无Markdown. 字段如下:
       {
-        "archetype": "A poetic 4-character title for this destiny pattern (e.g., 'Golden Water Harmony')",
-        "score": Integer between 0-100 indicating auspiciousness,
-        "summary": "A punchy 30-word summary of the destiny",
-        "appearanceAnalysis": "Analyze appearance and temperament based on Five Elements and Ma Yi Shen Xiang (approx 100 words). E.g., 'Metal Heavy' implies pale skin/oval face.",
-        "annualLuckAnalysis": "Detailed fortune for ${currentYear} (career, wealth, love) considering the interaction between Original Chart, Da Yun, and ${currentYear} (approx 150 words).",
-        "historicalFigures": [
-           {"name": "Name", "similarity": "90%", "reason": "Why they are similar"}
-        ] (List 5 figures),
-        "strengthAnalysis": "Analysis of the Day Master's strength and chart structure (100 words)",
-        "bookAdvice": "Advice in the style of 'Qiong Tong Bao Jian' (Classical Chinese)",
-        "bookAdviceTranslation": "Modern vernacular translation of the book advice",
-        "careerAdvice": "Actionable career direction based on Ten Gods",
-        "healthAdvice": "Health warnings based on Five Elements balance"
+        "archetype": "命格赐名(4字,如金水相涵)",
+        "score": 评分(0-100),
+        "summary": "30字精评",
+        "appearanceAnalysis": "容貌气质描述(基于五行/麻衣神相,100字)",
+        "annualLuckAnalysis": "${currentYear}年事业财运感情吉凶(结合大运流年,150字)",
+        "historicalFigures": [{"name":"名人名","similarity":"相似度","reason":"理由"}](5个),
+        "strengthAnalysis": "格局成败分析",
+        "bookAdvice": "穷通宝鉴建议(古文)",
+        "bookAdviceTranslation": "白话翻译",
+        "careerAdvice": "事业建议",
+        "healthAdvice": "健康建议"
       }
     `;
 
-    // Call DeepSeek API
-    const completion = await openai.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      model: "deepseek-chat", // Points to DeepSeek-V3.2
-      temperature: 1.1,      // DeepSeek recommends slightly higher temp for creative tasks (default is 1.0)
-      response_format: { type: "json_object" } // Enforces JSON output
-    });
-
-    const text = completion.choices[0].message.content;
+    console.log(`正在请求 AI (Google Gemini) 分析 [流年: ${currentYear}]...`);
     
-    // Safety Parse: Ensure valid JSON even if model adds fluff
+    // 带重试的调用
+    const result = await generateWithRetry(model, prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    // 强制提取 JSON
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        throw new Error("DeepSeek returned invalid format (No JSON found)");
-    }
+    if (!jsonMatch) throw new Error("AI 返回格式异常");
 
     const data = JSON.parse(jsonMatch[0]);
     res.json(data);
 
   } catch (error) {
-    console.error("DeepSeek API Error:", error);
-    
-    // Handle overload errors specifically
-    if (error.status === 503) {
-        res.status(503).json({ error: "DeepSeek is currently overloaded. Please try again in a moment." });
-    } else {
-        res.status(500).json({ error: error.message || "Server Error" });
-    }
+    console.error("服务端报错:", error.message);
+    res.status(500).json({ error: error.message || "服务器内部错误" });
   }
 });
 
 app.listen(port, () => {
-  console.log(`✅ DeepSeek Backend Server running: http://localhost:${port}`);
+  console.log(`✅ Google Gemini 后端已启动: http://localhost:${port}`);
 });
