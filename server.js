@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import 'dotenv/config'; // 👈 必须引用这个库
+// 👇 1. 引入 dotenv 库，这是隐藏 Key 的关键
+import 'dotenv/config'; 
 
 const app = express();
 const port = 3000;
@@ -9,15 +10,14 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ 正确做法：从 .env 文件读取
-// ❌ 绝对不要在这里写 "AIzaSy..." 字符串！
+// 👇 2. 安全读取 Key
+// 代码里没有 Key，它会去 .env 文件里找 GEMINI_API_KEY
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// 检查是否成功读取
+// 安全检查：如果没找到 Key，报错并停止
 if (!API_KEY) {
-  console.error("❌ 致命错误：未找到 API Key！");
-  console.error("请检查：1. 根目录下是否有 .env 文件");
-  console.error("       2. .env 文件里是否写了 GEMINI_API_KEY=你的Key");
+  console.error("❌ 致命错误：未找到 API Key。");
+  console.error("请检查项目根目录下是否有 .env 文件，且包含 GEMINI_API_KEY=...");
   process.exit(1);
 }
 
@@ -27,7 +27,8 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart, currentYear } = req.body; 
     
-    const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(', ') : "暂无大运数据";
+    // 保护性获取大运数据
+    const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
 
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash",
@@ -38,51 +39,44 @@ app.post('/api/analyze', async (req, res) => {
       }
     });
 
+    // 👇 3. Token 节省优化版 Prompt
+    // 删除了所有废话，只保留核心结构，既省钱又准确
     const prompt = `
-      (角色：精通《穷通宝鉴》、《三命通会》与《麻衣神相》的资深命理大师)
-      (任务：八字全盘分析 + 容貌画像 + ${currentYear}流年运势)
+      角色:资深命理师. 任务:八字及${currentYear}流年分析.
       
-      【基本信息】
-      八字：${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
-      日主：${chart.dayMaster} (${chart.dayMasterElement})
-      格局：${chart.strength}
-      大运：${daYunStr} (AI请自行推算当前大运)
-      当前流年：${currentYear}年 (丙午年)
+      [信息]
+      八字:${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
+      日主:${chart.dayMaster}(${chart.dayMasterElement}) 格局:${chart.strength}
+      大运:${daYunStr}
+      流年:${currentYear}
 
-      【分析要求 (必须返回纯JSON)】
-      请返回一个纯 JSON 对象，不要包含任何Markdown标记或额外的文字，必须严格包含以下字段：
-
-      1. "archetype": 命格赐名 (如“金水相涵格”)。
-      2. "score": 命局评分 (0-100)。
-      3. "summary": 30字短评。
-      
-      4. "appearanceAnalysis": 【容貌分析】
-         - 基于八字五行描述长相特征 (例如：金多皮肤白、木多修长、土多敦实、火多面红)。
-         - 描述气质 (如：清秀、威严、儒雅)。
-         - 用词优美，带有《麻衣神相》的风格，100字左右。
-
-      5. "annualLuckAnalysis": 【${currentYear} 流年运势】
-         - 结合原局、当前大运与 ${currentYear} 丙午流年进行推断。
-         - 重点分析：事业、财运、感情的变化。
-         - 给出具体的吉凶预警 (150字左右)。
-
-      6. "historicalFigures": 5个相似历史人物 (包含 name, similarity, reason)。
-      7. "strengthAnalysis": 格局成败分析。
-      8. "bookAdvice": 穷通宝鉴古文建议。
-      9. "bookAdviceTranslation": 穷通宝鉴白话翻译。
-      10. "careerAdvice": 事业建议。
-      11. "healthAdvice": 健康建议。
+      [要求]
+      输出纯JSON,无Markdown. 字段如下:
+      {
+        "archetype": "命格赐名(4字,如金水相涵)",
+        "score": 评分(0-100),
+        "summary": "30字精评",
+        "appearanceAnalysis": "容貌气质描述(基于五行/麻衣神相,100字)",
+        "annualLuckAnalysis": "${currentYear}年事业财运感情吉凶(结合大运流年,150字)",
+        "historicalFigures": [{"name":"名人名","similarity":"相似度","reason":"理由"}](5个),
+        "strengthAnalysis": "格局成败分析",
+        "bookAdvice": "穷通宝鉴建议(古文)",
+        "bookAdviceTranslation": "白话翻译",
+        "careerAdvice": "事业建议",
+        "healthAdvice": "健康建议"
+      }
     `;
 
-    console.log(`正在请求 AI (gemini-2.5-flash) 分析 [流年: ${currentYear}]...`);
+    console.log(`正在请求 AI (gemini-2.5-flash) [安全模式+Token优化]...`);
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-
+    
+    // 正则提取 JSON，防止 AI 说废话导致报错
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     
     if (!jsonMatch) {
-        throw new Error("AI 返回的内容不包含有效的 JSON 数据");
+        throw new Error("AI 返回格式异常");
     }
 
     const jsonString = jsonMatch[0];
