@@ -3,25 +3,19 @@ logs
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
+# 依赖包 (绝对不能传)
 node_modules
+
+# 构建输出
 dist
 dist-ssr
-*.local
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# 👇 必须加这个，防止 Key 泄露
+# 环境变量 (🔒 核心！必须忽略这个文件)
 .env
+.env.local
+.env.*
+
+# 系统文件
+.DS_Store
