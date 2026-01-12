@@ -18,21 +18,46 @@ if (!API_KEY) {
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// 🛡️ 增强版自动重试机制 (针对 503 Overloaded)
+// 🛡️ 智能 JSON 提取器 (核心修复：解决 'Unexpected non-whitespace' 报错)
+// 通过计算花括号的层级，精准提取第一个完整的 JSON 对象，忽略结尾的废话
+function extractJSON(str) {
+  let startIndex = str.indexOf('{');
+  if (startIndex === -1) return null;
+  
+  let braceCount = 0;
+  let endIndex = -1;
+  
+  for (let i = startIndex; i < str.length; i++) {
+    if (str[i] === '{') {
+      braceCount++;
+    } else if (str[i] === '}') {
+      braceCount--;
+      if (braceCount === 0) {
+        endIndex = i;
+        break;
+      }
+    }
+  }
+  
+  if (endIndex !== -1) {
+    return str.substring(startIndex, endIndex + 1);
+  }
+  return null;
+}
+
+// 自动重试机制 (针对 503 Overloaded)
 async function generateWithRetry(model, prompt, retries = 5, delay = 3000) {
   for (let i = 0; i < retries; i++) {
     try {
       return await model.generateContent(prompt);
     } catch (error) {
-      // 捕获 503 (服务器忙) 或 429 (频率限制)
       const isTransientError = error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('429');
-      
       if (isTransientError && i < retries - 1) {
-        console.warn(`⚠️ Google 服务器拥堵 (503)，正在进行第 ${i + 1}/${retries} 次重试... (等待 ${delay/1000}秒)`);
+        console.warn(`⚠️ Google 服务器繁忙 (503)，正在进行第 ${i + 1}/${retries} 次重试...`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2; // 指数退避：3s -> 6s -> 12s...
+        delay *= 2; 
       } else {
-        throw error; // 如果重试耗尽或遇到其他错误，抛出
+        throw error;
       }
     }
   }
@@ -49,7 +74,6 @@ app.post('/api/analyze', async (req, res) => {
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    // 🔥 深度解析 & 强制 5 人 Prompt
     const prompt = `
       【角色设定】
       你是一位精通《三命通会》、《穷通宝鉴》与《麻衣神相》的资深中文命理大师。你的风格是**深度、详尽、专业**。
@@ -66,7 +90,7 @@ app.post('/api/analyze', async (req, res) => {
       五行: ${balanceStr}
       灵数: ${lingShu.lifePathNumber}
 
-      【输出任务 (必须严格返回JSON)】
+      【输出任务 (必须严格返回JSON，不要包含Markdown代码块)】
       {
         "archetype": "命格赐名(4字,如金水相涵)",
         "summary": "30字精评(一针见血)",
@@ -91,13 +115,20 @@ app.post('/api/analyze', async (req, res) => {
     console.log("正在请求 AI (深度八字分析)...");
     const result = await generateWithRetry(model, prompt);
     const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("AI 返回格式异常");
-    res.json(JSON.parse(jsonMatch[0]));
+    
+    // ✅ 使用智能提取器，彻底解决 JSON 解析错误
+    const jsonStr = extractJSON(text);
+    
+    if (!jsonStr) {
+        console.error("AI 返回原始内容:", text);
+        throw new Error("无法从 AI 返回中提取有效的 JSON 数据");
+    }
+
+    const data = JSON.parse(jsonStr);
+    res.json(data);
 
   } catch (error) {
     console.error("API 错误:", error.message);
-    // 返回更友好的错误信息给前端
     if (error.message.includes('503') || error.message.includes('overloaded')) {
         res.status(503).json({ error: "AI 大脑过载（Google服务器繁忙），已自动重试多次仍失败，请稍后几秒再试。" });
     } else {
@@ -141,12 +172,14 @@ app.post('/api/qimen', async (req, res) => {
     console.log("正在请求 AI (奇门决策)...");
     const aiRes = await generateWithRetry(model, prompt);
     const text = aiRes.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("AI Error");
-    res.json(JSON.parse(jsonMatch[0]));
+    
+    // ✅ 同样使用智能提取器
+    const jsonStr = extractJSON(text);
+    if (!jsonStr) throw new Error("AI 奇门数据格式异常");
+
+    res.json(JSON.parse(jsonStr));
 
   } catch (error) {
-    console.error("奇门 API 错误:", error.message);
     res.status(500).json({ error: error.message });
   }
 });

@@ -8,7 +8,7 @@ import { analyzeBaziWithAI, analyzeQimenWithAI, AIAnalysisResult, QimenAIResult 
 const SafeText = ({ content }: { content: any }) => {
   if (content === null || content === undefined) return null;
   if (typeof content === 'string') return <>{content}</>;
-  return <span className="text-red-400 text-xs">【数据解析中...】</span>;
+  return <span className="text-red-400 text-xs">【正在解析...】</span>;
 };
 
 const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: any; isDayMaster?: boolean }) => {
@@ -39,7 +39,7 @@ const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: an
   );
 };
 
-// ✅ 汉化 Tab 名称
+// 中文 Tab 映射
 const TAB_NAMES: Record<string, string> = {
   energy: '格局能量',
   luck: '流年运势',
@@ -77,6 +77,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'energy' | 'luck' | 'numerology' | 'qimen' | 'ancient' | 'career'>('energy');
   const [isTranslated, setIsTranslated] = useState(false);
 
+  // 城市搜索功能
   const handleCitySearch = async () => {
     if(!citySearch) return;
     setIsSearchingCity(true);
@@ -219,7 +220,7 @@ export default function App() {
                                 <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs">{gender==='male'?'乾造':'坤造'}</span>
                             </div>
                             <h1 className="text-3xl font-bold text-slate-800 mb-2">
-                                <SafeText content={aiResult?.archetype || "正在计算..."} />
+                                <SafeText content={aiResult?.archetype || "计算中..."} />
                             </h1>
                             <p className="text-slate-600 italic"><SafeText content={aiResult?.summary || "AI 正在深度解析您的命盘..."} /></p>
                         </div>
@@ -238,7 +239,7 @@ export default function App() {
                         <PillarCard title="时" pillar={result.hour} />
                     </div>
 
-                    {/* ✅ Tabs: 现在全部都是中文了 */}
+                    {/* Tabs */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex overflow-x-auto">
                         {['energy', 'luck', 'numerology', 'career', 'ancient', 'qimen'].map(t => (
                             <button key={t} onClick={()=>setActiveTab(t as any)} className={`flex-1 py-3 text-sm font-bold whitespace-nowrap px-4 ${activeTab===t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}>
