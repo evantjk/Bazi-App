@@ -1,8 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-// 👇 引入 dotenv，这行代码会自动读取 .env 文件里的内容
-import 'dotenv/config'; 
+import 'dotenv/config'; // 👈 必须引用这个库
 
 const app = express();
 const port = 3000;
@@ -10,13 +9,16 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ 安全修改：从环境变量中读取 Key
-// 如果没读到，就报错提醒
+// ✅ 正确做法：从 .env 文件读取
+// ❌ 绝对不要在这里写 "AIzaSy..." 字符串！
 const API_KEY = process.env.GEMINI_API_KEY;
 
+// 检查是否成功读取
 if (!API_KEY) {
-  console.error("❌ 错误：未找到 API Key。请确保项目根目录下有 .env 文件，并且里面写了 GEMINI_API_KEY=...");
-  process.exit(1); // 没 Key 跑不起来，直接退出
+  console.error("❌ 致命错误：未找到 API Key！");
+  console.error("请检查：1. 根目录下是否有 .env 文件");
+  console.error("       2. .env 文件里是否写了 GEMINI_API_KEY=你的Key");
+  process.exit(1);
 }
 
 const genAI = new GoogleGenerativeAI(API_KEY);
