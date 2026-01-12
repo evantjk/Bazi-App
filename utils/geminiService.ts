@@ -31,12 +31,11 @@ export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 
         } catch (e) {
             errorMsg = errorText || response.statusText;
         }
-        throw new Error(errorMsg); // 抛出具体错误 (如: "API Key Invalid")
+        throw new Error(errorMsg); 
     }
     
     return await response.json();
   } catch (error: any) {
-    // 允许错误透传给 UI
     throw error; 
   }
 }
@@ -62,7 +61,6 @@ export async function analyzeQimenWithAI(type: QimenType, context: string, resul
     }
     return await response.json();
   } catch (error: any) {
-    // 奇门如果 AI 挂了，返回保底数据，不影响信号灯显示
     console.error("奇门 AI 错误:", error.message);
     return {
       mainTendency: "AI 服务暂时不可用",

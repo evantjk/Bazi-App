@@ -8,7 +8,7 @@ import { analyzeBaziWithAI, analyzeQimenWithAI, AIAnalysisResult, QimenAIResult 
 const SafeText = ({ content }: { content: any }) => {
   if (content === null || content === undefined) return null;
   if (typeof content === 'string') return <>{content}</>;
-  return <span className="text-red-400 text-xs">【格式异常】</span>;
+  return <span className="text-red-400 text-xs">【数据解析中...】</span>;
 };
 
 const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: any; isDayMaster?: boolean }) => {
@@ -37,6 +37,16 @@ const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: an
       <span className="text-[10px] text-slate-400 mt-1">{pillar.zodiac} · {pillar.hiddenStems[0]}</span>
     </div>
   );
+};
+
+// ✅ 汉化 Tab 名称
+const TAB_NAMES: Record<string, string> = {
+  energy: '格局能量',
+  luck: '流年运势',
+  numerology: '灵数解析',
+  career: '事业发展',
+  ancient: '古籍经典',
+  qimen: '奇门决策'
 };
 
 export default function App() {
@@ -78,7 +88,7 @@ export default function App() {
             setLongitude(lon);
             alert(`已定位到 ${data[0].display_name.split(',')[0]} (经度: ${lon})`);
         } else {
-            alert("未找到该城市，请尝试输入英文拼写");
+            alert("未找到该城市，请尝试输入中文或英文拼写");
         }
     } catch(e) {
         alert("定位服务连接失败");
@@ -134,7 +144,7 @@ export default function App() {
         <div className="h-full flex flex-col p-6 overflow-y-auto">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-indigo-500 p-2 rounded-lg"><Sparkles className="text-white" size={20} /></div>
-            <div><h1 className="text-xl font-bold">命理实验室</h1><span className="text-[10px] border border-indigo-700 px-1 rounded">创造者模式</span></div>
+            <div><h1 className="text-xl font-bold">命理实验室</h1><span className="text-[10px] border border-indigo-700 px-1 rounded">专业版</span></div>
           </div>
           
           <div className="space-y-6">
@@ -146,7 +156,7 @@ export default function App() {
             <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Search size={12}/> 城市定位 (真太阳时)</label>
                 <div className="flex gap-2">
-                    <input type="text" value={citySearch} onChange={(e) => setCitySearch(e.target.value)} placeholder="如 Shanghai, Beijing" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3 focus:outline-none focus:border-indigo-500 text-sm" />
+                    <input type="text" value={citySearch} onChange={(e) => setCitySearch(e.target.value)} placeholder="如 上海, 北京" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3 focus:outline-none focus:border-indigo-500 text-sm" />
                     <button onClick={handleCitySearch} disabled={isSearchingCity} className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg disabled:opacity-50">
                         {isSearchingCity ? <span className="animate-spin">⏳</span> : <Search size={16}/>}
                     </button>
@@ -193,7 +203,7 @@ export default function App() {
                 <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700">
                     <XCircle size={24} />
                     <div>
-                        <p className="font-bold">AI 分析服务异常</p>
+                        <p className="font-bold">分析服务提示</p>
                         <p className="text-sm">{errorMsg}</p>
                     </div>
                 </div>
@@ -209,9 +219,9 @@ export default function App() {
                                 <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs">{gender==='male'?'乾造':'坤造'}</span>
                             </div>
                             <h1 className="text-3xl font-bold text-slate-800 mb-2">
-                                <SafeText content={aiResult?.archetype || "AI思考中..."} />
+                                <SafeText content={aiResult?.archetype || "正在计算..."} />
                             </h1>
-                            <p className="text-slate-600 italic"><SafeText content={aiResult?.summary || "正在生成命理报告..."} /></p>
+                            <p className="text-slate-600 italic"><SafeText content={aiResult?.summary || "AI 正在深度解析您的命盘..."} /></p>
                         </div>
                         <div className="flex items-center gap-4">
                              <div className="text-center">
@@ -228,11 +238,11 @@ export default function App() {
                         <PillarCard title="时" pillar={result.hour} />
                     </div>
 
-                    {/* Tabs */}
+                    {/* ✅ Tabs: 现在全部都是中文了 */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex overflow-x-auto">
                         {['energy', 'luck', 'numerology', 'career', 'ancient', 'qimen'].map(t => (
-                            <button key={t} onClick={()=>setActiveTab(t as any)} className={`flex-1 py-3 text-sm font-bold capitalize whitespace-nowrap px-4 ${activeTab===t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}>
-                                {t === 'qimen' ? '奇门决策' : t === 'numerology' ? '灵数' : t === 'ancient' ? '古籍' : t === 'energy' ? '格局' : t}
+                            <button key={t} onClick={()=>setActiveTab(t as any)} className={`flex-1 py-3 text-sm font-bold whitespace-nowrap px-4 ${activeTab===t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}>
+                                {TAB_NAMES[t] || t}
                             </button>
                         ))}
                     </div>
