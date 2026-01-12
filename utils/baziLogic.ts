@@ -150,25 +150,22 @@ export function getAnnualRelations(chart: BaziChart, currentYearBranch: string):
     return relations;
 }
 
-// ✅ 修复：灵数计算逻辑 (解决 parseInt 报错)
+// ✅ 修复：灵数计算逻辑 (添加类型注解，解决 parseInt 报错)
 function calculateLingShu(date: Date): LingShu {
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
     const day = date.getDate();
     
-    // 1. 提取所有数字 (YYYYMMDD)
     const dateStr = `${year}${month < 10 ? '0'+month : month}${day < 10 ? '0'+day : day}`;
     const digits = dateStr.split('').map(Number);
     
-    // 2. 计算命数 (Life Path Number) - 递归相加直到个位数
     let sum = digits.reduce((a, b) => a + b, 0);
     while (sum > 9) {
-        // 修复：确保所有操作数都是 number
-        sum = sum.toString().split('').reduce((a, b) => a + parseInt(b), 0);
+        // ✅ 显式指定 a 为 number, b 为 string，彻底消除 TS 歧义
+        sum = sum.toString().split('').reduce((a: number, b: string) => a + parseInt(b), 0);
     }
     const lifePathNumber = sum;
 
-    // 3. 计算九宫格分布 (Lo Shu Grid)
     const grid: Record<number, number> = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0};
     const missingNumbers: number[] = [];
     

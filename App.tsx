@@ -55,6 +55,7 @@ export default function App() {
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // ✅ 新增错误状态
   
   // 奇门 States
   const [qimenType, setQimenType] = useState<QimenType>('career');
@@ -63,7 +64,6 @@ export default function App() {
   const [qimenAI, setQimenAI] = useState<QimenAIResult | null>(null);
   const [qimenLoading, setQimenLoading] = useState(false);
 
-  // Tabs (✅ 确保 'ancient' 在这里)
   const [activeTab, setActiveTab] = useState<'energy' | 'luck' | 'numerology' | 'qimen' | 'ancient' | 'career'>('energy');
   const [isTranslated, setIsTranslated] = useState(false);
 
@@ -88,17 +88,28 @@ export default function App() {
   };
 
   const handleAnalyze = async () => {
-    setLoading(true); setAiLoading(true); setSidebarOpen(false); setResult(null); setAiResult(null);
+    setLoading(true); setAiLoading(true); setSidebarOpen(false); setResult(null); setAiResult(null); setErrorMsg(null);
+    
+    let chart: BaziChart;
     try {
-        const chart = calculateBazi(new Date(`${date}T${time}`), longitude, gender);
+        chart = calculateBazi(new Date(`${date}T${time}`), longitude, gender);
         setResult(chart);
-        setLoading(false); 
-        const analysis = await analyzeBaziWithAI(chart, 2026);
-        setAiResult(analysis);
     } catch (error) {
         alert("排盘错误，请检查输入");
-    } finally {
         setLoading(false); setAiLoading(false);
+        return;
+    }
+    
+    setLoading(false); // 本地计算完成
+
+    try {
+        const analysis = await analyzeBaziWithAI(chart, 2026);
+        setAiResult(analysis);
+    } catch (error: any) {
+        console.error("AI 分析失败", error);
+        setErrorMsg(error.message || "AI 服务暂时不可用"); // ✅ 显示真实错误
+    } finally {
+        setAiLoading(false);
     }
   };
 
@@ -176,6 +187,18 @@ export default function App() {
         )}
 
         <div className="max-w-6xl mx-auto p-6 lg:p-10 space-y-8 animate-fade-in">
+            
+            {/* 🔴 错误提示框 */}
+            {errorMsg && (
+                <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700">
+                    <XCircle size={24} />
+                    <div>
+                        <p className="font-bold">AI 分析服务异常</p>
+                        <p className="text-sm">{errorMsg}</p>
+                    </div>
+                </div>
+            )}
+
             {/* 八字结果展示 */}
             {result && (
                 <>
@@ -205,7 +228,7 @@ export default function App() {
                         <PillarCard title="时" pillar={result.hour} />
                     </div>
 
-                    {/* Tabs (✅ 找回 'ancient' 等 Tab) */}
+                    {/* Tabs */}
                     <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex overflow-x-auto">
                         {['energy', 'luck', 'numerology', 'career', 'ancient', 'qimen'].map(t => (
                             <button key={t} onClick={()=>setActiveTab(t as any)} className={`flex-1 py-3 text-sm font-bold capitalize whitespace-nowrap px-4 ${activeTab===t ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}>
@@ -215,7 +238,6 @@ export default function App() {
                     </div>
 
                     <div className="p-6 bg-white rounded-2xl border border-slate-100 min-h-[300px]">
-                        {/* ✅ 修复：在 Energy Tab 中加回容貌和历史人物 */}
                         {activeTab === 'energy' && (
                             <div className="space-y-8">
                                 <FiveElementChart scores={result.fiveElementScore} />
@@ -264,7 +286,6 @@ export default function App() {
                             </div>
                         )}
 
-                        {/* ✅ 修复：加回 Ancient 古籍 Tab */}
                         {activeTab === 'ancient' && (
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center border-b pb-2">

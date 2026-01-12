@@ -20,14 +20,27 @@ export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chart, currentYear }), 
     });
-    if (!response.ok) throw new Error("Server Error");
+    
+    // ✅ 修复：解析真实错误原因
+    if (!response.ok) {
+        const errorText = await response.text();
+        let errorMsg = "Server Error";
+        try {
+            const errorObj = JSON.parse(errorText);
+            if (errorObj.error) errorMsg = errorObj.error;
+        } catch (e) {
+            errorMsg = errorText || response.statusText;
+        }
+        throw new Error(errorMsg); // 抛出具体错误 (如: "API Key Invalid")
+    }
+    
     return await response.json();
   } catch (error: any) {
-    return mockAIResponse(chart, error.message);
+    // 允许错误透传给 UI
+    throw error; 
   }
 }
 
-// ✅ 新增奇门接口
 export async function analyzeQimenWithAI(type: QimenType, context: string, result: QimenResult): Promise<QimenAIResult> {
   try {
     const response = await fetch('/api/qimen', {
@@ -35,22 +48,27 @@ export async function analyzeQimenWithAI(type: QimenType, context: string, resul
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, context, result }), 
     });
-    if (!response.ok) throw new Error("Server Error");
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        let errorMsg = "Server Error";
+        try {
+            const errorObj = JSON.parse(errorText);
+            if (errorObj.error) errorMsg = errorObj.error;
+        } catch (e) {
+            errorMsg = errorText || response.statusText;
+        }
+        throw new Error(errorMsg);
+    }
     return await response.json();
   } catch (error: any) {
+    // 奇门如果 AI 挂了，返回保底数据，不影响信号灯显示
+    console.error("奇门 AI 错误:", error.message);
     return {
-      mainTendency: "连接中断，仅显示盘面数据",
-      reasoning: ["网络连接失败", "请检查网络"],
-      actionAdvice: "请直接参考信号灯行动",
+      mainTendency: "AI 服务暂时不可用",
+      reasoning: ["请检查 API Key", error.message],
+      actionAdvice: "请直接参考上方的红绿灯信号。",
       riskAlert: "数据仅供参考"
     };
   }
-}
-
-function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
-  return {
-    archetype: "连接中断", summary: errorMsg, appearanceAnalysis: "...", annualLuckAnalysis: "...",
-    historicalFigures: [], strengthAnalysis: "...", bookAdvice: "...", bookAdviceTranslation: "...",
-    careerAdvice: "...", healthAdvice: "...", numerologyAnalysis: "..."
-  };
 }

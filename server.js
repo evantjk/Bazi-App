@@ -38,10 +38,10 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { chart, currentYear } = req.body; 
     
-    // 数据准备
-    const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
-    const balanceStr = chart.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
-    const lingShu = chart.lingShu || { lifePathNumber: 0 };
+    // 安全获取数据，防止 undefind 崩溃
+    const daYunStr = chart?.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
+    const balanceStr = chart?.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
+    const lingShu = chart?.lingShu || { lifePathNumber: 0 };
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -51,14 +51,13 @@ app.post('/api/analyze', async (req, res) => {
       
       【语言要求】
       1. 全程使用**简体中文**。
-      2. 用词专业、优雅、温和，严禁中英文夹杂。
-      3. 风格：理性分析，拒绝封建迷信恐吓。
+      2. 用词专业、优雅、温和。
 
       【客观事实】
       八字: ${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
       日主: ${chart.dayMaster} 格局: ${chart.strength}
       大运: ${daYunStr}
-      评分: ${chart.destinyScore} (这是硬指标)
+      评分: ${chart.destinyScore}
       五行: ${balanceStr}
       灵数: ${lingShu.lifePathNumber}
 
@@ -80,13 +79,15 @@ app.post('/api/analyze', async (req, res) => {
       }
     `;
 
+    console.log("正在请求 AI (八字)...");
     const result = await generateWithRetry(model, prompt);
     const text = result.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Format Error");
+    if (!jsonMatch) throw new Error("AI 返回格式异常");
     res.json(JSON.parse(jsonMatch[0]));
 
   } catch (error) {
+    console.error("API 错误:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -123,6 +124,7 @@ app.post('/api/qimen', async (req, res) => {
       }
     `;
     
+    console.log("正在请求 AI (奇门)...");
     const aiRes = await generateWithRetry(model, prompt);
     const text = aiRes.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -130,6 +132,7 @@ app.post('/api/qimen', async (req, res) => {
     res.json(JSON.parse(jsonMatch[0]));
 
   } catch (error) {
+    console.error("奇门 API 错误:", error.message);
     res.status(500).json({ error: error.message });
   }
 });
