@@ -50,7 +50,7 @@ export interface BaziChart {
   month: Pillar;
   day: Pillar;
   hour: Pillar;
-  daYun: DaYun[]; // ✅ 必须包含此字段
+  daYun: DaYun[];
   fiveElementScore: FiveElementScore;
   destinyScore: number;
   dayMaster: string;
@@ -58,6 +58,9 @@ export interface BaziChart {
   strength: string;
   seasonStatus: string;
   strongestElement: ElementType;
+  // ✅ 新增：把“诊断权”收回代码
+  weakestElement: ElementType; 
+  balanceNote: string[]; // 例如 ["火太旺(风险)", "缺水(需补)"]
 }
 
 // --- Constants ---
@@ -125,12 +128,31 @@ function getEquationOfTime(date: Date): number {
   return 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
 }
 
+// 计算流年冲合
+export function getAnnualRelations(chart: BaziChart, currentYearBranch: string): string[] {
+    const relations: string[] = [];
+    const branches = [chart.year.branch, chart.month.branch, chart.day.branch, chart.hour.branch];
+    const positions = ["年", "月", "日", "时"];
+    
+    const clashes: Record<string, string> = {
+        '子': '午', '午': '子', '丑': '未', '未': '丑', '寅': '申', '申': '寅', 
+        '卯': '酉', '酉': '卯', '辰': '戌', '戌': '辰', '巳': '亥', '亥': '巳'
+    };
+
+    branches.forEach((b, idx) => {
+        if (clashes[b] === currentYearBranch) {
+            relations.push(`${b}${currentYearBranch}冲 (${positions[idx]}柱)`);
+        }
+    });
+
+    return relations;
+}
+
 // --- Main Logic ---
 
 export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gender): BaziChart {
   const longitude = parseLongitude(longitudeStr);
   const tzStandard = 120; 
-
   const longOffsetMinutes = (longitude - tzStandard) * 4;
   const eotMinutes = getEquationOfTime(inputDate);
   const totalOffsetMinutes = longOffsetMinutes + eotMinutes;
@@ -141,7 +163,6 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
     inputDate.getFullYear(), inputDate.getMonth() + 1, inputDate.getDate(),
     inputDate.getHours(), inputDate.getMinutes(), inputDate.getSeconds()
   );
-
   const solarTST = Solar.fromYmdHms(
     trueSolarDate.getFullYear(), trueSolarDate.getMonth() + 1, trueSolarDate.getDate(),
     trueSolarDate.getHours(), trueSolarDate.getMinutes(), trueSolarDate.getSeconds()
@@ -150,18 +171,15 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
   const lunarStandard = solarStandard.getLunar();
   const eightCharStandard = lunarStandard.getEightChar();
   eightCharStandard.setSect(1); 
-
   const lunarTST = solarTST.getLunar();
   const eightCharTST = lunarTST.getEightChar();
   eightCharTST.setSect(1);
 
   const yearGan = eightCharStandard.getYearGan(); const yearZhi = eightCharStandard.getYearZhi();
   const monthGan = eightCharStandard.getMonthGan(); const monthZhi = eightCharStandard.getMonthZhi();
-
   const dayGan = eightCharTST.getDayGan(); const dayZhi = eightCharTST.getDayZhi();
   const timeGan = eightCharTST.getTimeGan(); const timeZhi = eightCharTST.getTimeZhi();
 
-  // ✅ 计算大运
   const yun = eightCharStandard.getYun(gender === 'male' ? 1 : 0);
   const daYunArrNative = yun.getDaYun();
   
@@ -191,7 +209,20 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
 
   const scores = calculateScores(yearPillar, monthPillar, dayPillar, hourPillar);
   const strengthResult = calculateStrengthAdvanced(scores, dayMasterDetail.element, seasonStatus, monthBranchDetail.element);
-  const strongestEl = (Object.keys(scores) as ElementType[]).reduce((a, b) => scores[a] > scores[b] ? a : b);
+  
+  // 找最强最弱
+  const sortedElements = (Object.keys(scores) as ElementType[]).sort((a, b) => scores[b] - scores[a]);
+  const strongestEl = sortedElements[0];
+  const weakestEl = sortedElements[sortedElements.length - 1];
+
+  // ✅ 系统级诊断：生成“风险/平衡”标签 (Risk Tags)
+  const balanceNote: string[] = [];
+  Object.entries(scores).forEach(([el, score]) => {
+      const name = ELEMENT_CN_MAP[el as ElementType];
+      if (score >= 40) balanceNote.push(`${name}过旺(需泄耗)`);
+      if (score < 5) balanceNote.push(`${name}极弱(需帮扶)`);
+  });
+  if (balanceNote.length === 0) balanceNote.push("五行相对平衡");
 
   const scoreValues = Object.values(scores);
   const avg = scoreValues.reduce((a, b) => a + b, 0) / 5;
@@ -212,16 +243,19 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
         gender: gender === 'male' ? '男' : '女'
     },
     year: yearPillar, month: monthPillar, day: dayPillar, hour: hourPillar,
-    daYun: daYunList, // ✅ 返回大运
-    fiveElementScore: scores, destinyScore,
+    daYun: daYunList,
+    fiveElementScore: scores, 
+    destinyScore,
     dayMaster, dayMasterElement: dayMasterDetail.element,
     strength: strengthResult.desc,
     seasonStatus: seasonStatus,
-    strongestElement: strongestEl
+    strongestElement: strongestEl,
+    weakestElement: weakestEl, // ✅ 导出最弱
+    balanceNote // ✅ 导出诊断结果
   };
 }
 
-// --- Helper Functions ---
+// --- Helper Functions (保持不变) ---
 function createPillar(stem: string, branch: string, dayMaster: string, kw: string[], yZhi: string, dZhi: string, mZhi: string): Pillar {
   const sDetail = STEM_DETAILS[stem];
   const bDetail = BRANCH_DETAILS[branch];

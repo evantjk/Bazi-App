@@ -8,10 +8,10 @@ export interface HistoricalFigure {
 
 export interface AIAnalysisResult {
   archetype: string;
-  score: number;
+  // ❌ score 字段已移除，因为我们直接用 baziChart.destinyScore
   summary: string;
-  appearanceAnalysis: string; // ✅ 新增：容貌分析
-  annualLuckAnalysis: string; // ✅ 新增：流年运势
+  appearanceAnalysis: string;
+  annualLuckAnalysis: string;
   historicalFigures: HistoricalFigure[];
   strengthAnalysis: string;
   bookAdvice: string;
@@ -20,7 +20,7 @@ export interface AIAnalysisResult {
   healthAdvice: string;
 }
 
-export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 2026): Promise<AIAnalysisResult> {
+export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 2026, relations: string[] = []): Promise<AIAnalysisResult> {
   try {
     console.log("正在请求后端 API (/api/analyze)...");
     
@@ -29,8 +29,8 @@ export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 
       headers: {
         'Content-Type': 'application/json',
       },
-      // ✅ 传递 currentYear 参数
-      body: JSON.stringify({ chart, currentYear }), 
+      // ✅ 传输 currentYear 和 本地计算的 relations
+      body: JSON.stringify({ chart, currentYear, relations }), 
     });
 
     if (!response.ok) {
@@ -56,7 +56,6 @@ export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 
 function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
   return {
     archetype: "连接中断",
-    score: 0,
     summary: `【错误详情】：${errorMsg}`,
     appearanceAnalysis: "无法连接服务器。",
     annualLuckAnalysis: "无法连接服务器。",

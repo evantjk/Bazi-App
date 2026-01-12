@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Sparkles, Zap, Scroll, Bot, Menu, ArrowRight, MapPin, Globe, Activity, BookOpen, User, Star, Award, Languages, TrendingUp, Smile, Baby } from 'lucide-react';
 import { FiveElementChart } from './components/FiveElementChart';
-import { calculateBazi, BaziChart, Pillar, ElementType, Gender } from './utils/baziLogic';
+import { calculateBazi, BaziChart, Pillar, ElementType, Gender, getAnnualRelations } from './utils/baziLogic';
 import { analyzeBaziWithAI, AIAnalysisResult } from './utils/geminiService';
+
+// --- 安全渲染组件 ---
+const SafeText = ({ content }: { content: any }) => {
+  if (content === null || content === undefined) return null;
+  if (typeof content === 'string') return <>{content}</>;
+  if (typeof content === 'number') return <>{content}</>;
+  return <span className="text-red-400 text-xs">【数据格式异常】{JSON.stringify(content)}</span>;
+};
 
 // --- 子组件：单柱卡片 ---
 const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: Pillar; isDayMaster?: boolean }) => {
@@ -36,7 +44,6 @@ const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: Pi
   );
 };
 
-// --- 主应用组件 ---
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -48,13 +55,13 @@ export default function App() {
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  
   const [activeTab, setActiveTab] = useState<'energy' | 'luck' | 'ancient' | 'career'>('energy');
   const [isTranslated, setIsTranslated] = useState(false);
 
   const handleAnalyze = async () => {
+    // 1. 先重置状态
     setLoading(true);
-    setAiLoading(true);
+    setAiLoading(true); // AI 开始加载
     setSidebarOpen(false); 
     setResult(null);
     setAiResult(null);
@@ -63,22 +70,28 @@ export default function App() {
     let chart: BaziChart;
     try {
         const inputDate = new Date(`${date}T${time}`);
+        // 2. 本地秒算：排盘 + 评分 + 冲合
         chart = calculateBazi(inputDate, longitude, gender);
-        setResult(chart);
+        setResult(chart); // ✅ 界面立刻显示圆环和分数
     } catch (error) {
-        alert("排盘出错了，请检查输入格式");
+        alert("排盘出错了，请检查输入格式或确保依赖已更新");
         setLoading(false); setAiLoading(false);
         return;
     }
-    setLoading(false);
+    setLoading(false); // 本地计算完成，Loading 结束
+
+    // 3. 计算流年关系 (比如 2026 丙午，地支是“午”)
+    const currentYearBranch = '午'; // 2026是午年，这里简化处理。严谨做法可用 lunar-typescript 算流年地支
+    const relations = getAnnualRelations(chart, currentYearBranch);
 
     try {
-        const analysis = await analyzeBaziWithAI(chart, 2026);
+        // 4. 请求 AI (后台慢慢算，前端显示骨架屏)
+        const analysis = await analyzeBaziWithAI(chart, 2026, relations);
         setAiResult(analysis);
     } catch (error) {
         console.error("AI 分析失败", error);
     } finally {
-        setAiLoading(false);
+        setAiLoading(false); // AI 结束
     }
   };
 
@@ -105,7 +118,7 @@ export default function App() {
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Clock size={12}/> 出生时间</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Globe size={12}/> 出生地经度</label><input type="text" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="如: 103°45'34" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
           </div>
-          <button onClick={handleAnalyze} disabled={loading || aiLoading} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2 mt-4 hover:opacity-90 disabled:opacity-50">{loading ? <span>计算中...</span> : <>开始排盘 <ArrowRight size={18} /></>}</button>
+          <button onClick={handleAnalyze} disabled={loading || aiLoading} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2 mt-4 hover:opacity-90 disabled:opacity-50">{loading ? <span>排盘中...</span> : aiLoading ? <span>AI思考中...</span> : <>开始排盘 <ArrowRight size={18} /></>}</button>
         </div>
       </div>
 
@@ -125,30 +138,30 @@ export default function App() {
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
                 <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded uppercase">Gemini 2.5 Analysis</span>
+                        <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded uppercase">Hybrid Analysis</span>
                         <span className="text-slate-500 text-xs flex items-center gap-1"><MapPin size={12}/> {result.meta.trueSolarTime} 真太阳时</span>
                         <span className={`text-xs px-2 py-0.5 rounded text-white ${gender==='male'?'bg-indigo-500':'bg-pink-500'}`}>{gender==='male'?'乾造 (男)':'坤造 (女)'}</span>
                     </div>
+                    {/* 骨架屏优化：如果 AI 还没算出名字，显示占位符，而不是空白 */}
                     <h1 className="text-3xl lg:text-5xl font-bold text-slate-800 font-serif mb-2 tracking-tight">
-                        {aiResult ? aiResult.archetype : <span className="animate-pulse bg-slate-200 text-transparent rounded">正在计算...</span>}
+                        {aiResult ? aiResult.archetype : <span className="animate-pulse bg-slate-200 text-transparent rounded">命格计算中...</span>}
                     </h1>
                     <p className="text-slate-600 text-lg font-serif italic">
-                        "{aiResult ? aiResult.summary : 'AI 正在阅读您的星盘...'}"
+                        "{aiResult ? <SafeText content={aiResult.summary} /> : 'AI 正在阅读您的星盘...'}"
                     </p>
                 </div>
                 <div className="flex items-center gap-6">
-                    {aiResult && (
-                        <div className="flex flex-col items-center">
-                            <div className="relative w-24 h-24 flex items-center justify-center">
-                                <svg className="w-full h-full transform -rotate-90">
-                                    <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                                    <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={251.2} strokeDashoffset={251.2 - (251.2 * aiResult.score) / 100} className={`transition-all duration-1000 ease-out ${aiResult.score >= 80 ? 'text-emerald-500' : aiResult.score >= 60 ? 'text-indigo-500' : 'text-amber-500'}`} />
-                                </svg>
-                                <span className="absolute text-2xl font-bold text-slate-700">{aiResult.score}</span>
-                            </div>
-                            <span className="text-xs font-semibold text-slate-400 uppercase mt-2">格局评分</span>
+                    {/* ✅ 直接显示本地算出的分数 result.destinyScore，不需要等 AI */}
+                    <div className="flex flex-col items-center">
+                        <div className="relative w-24 h-24 flex items-center justify-center">
+                            <svg className="w-full h-full transform -rotate-90">
+                                <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
+                                <circle cx="48" cy="48" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={251.2} strokeDashoffset={251.2 - (251.2 * result.destinyScore) / 100} className={`transition-all duration-1000 ease-out ${result.destinyScore >= 80 ? 'text-emerald-500' : result.destinyScore >= 60 ? 'text-indigo-500' : 'text-amber-500'}`} />
+                            </svg>
+                            <span className="absolute text-2xl font-bold text-slate-700">{result.destinyScore}</span>
                         </div>
-                    )}
+                        <span className="text-xs font-semibold text-slate-400 uppercase mt-2">本地评分</span>
+                    </div>
                 </div>
             </div>
 
@@ -165,14 +178,17 @@ export default function App() {
                     <span className="text-xs text-slate-400">每10年一运</span>
                 </div>
                 <div className="flex gap-4 min-w-max pb-2">
-                    {/* ✅ 修复点：添加 ? 防止数组不存在时白屏 */}
-                    {result.daYun?.map((yun, idx) => (
-                        <div key={idx} className="flex flex-col items-center bg-slate-50 border border-slate-100 rounded-lg p-2 min-w-[70px]">
-                            <span className="text-[10px] text-slate-400 mb-1">{yun.startAge}岁</span>
-                            <span className="text-lg font-serif font-bold text-slate-700">{yun.ganZhi}</span>
-                            <span className="text-[9px] text-slate-400 mt-1">{yun.year}年</span>
-                        </div>
-                    ))}
+                    {result.daYun && result.daYun.length > 0 ? (
+                        result.daYun.map((yun, idx) => (
+                            <div key={idx} className="flex flex-col items-center bg-slate-50 border border-slate-100 rounded-lg p-2 min-w-[70px]">
+                                <span className="text-[10px] text-slate-400 mb-1">{yun.startAge}岁</span>
+                                <span className="text-lg font-serif font-bold text-slate-700">{yun.ganZhi}</span>
+                                <span className="text-[9px] text-slate-400 mt-1">{yun.year}年</span>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-xs text-slate-300 p-2">暂无大运数据</div>
+                    )}
                 </div>
             </div>
 
@@ -182,16 +198,18 @@ export default function App() {
                         <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">五行能量</h3>
                         <FiveElementChart scores={result.fiveElementScore} />
                     </div>
+                    
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                          <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
                             <Smile size={16}/> 容貌分析
                         </h3>
                          {aiResult ? (
                             <p className="text-sm text-slate-600 leading-relaxed text-justify italic font-serif">
-                                {aiResult.appearanceAnalysis}
+                                <SafeText content={aiResult.appearanceAnalysis} />
                             </p>
                          ) : <div className="animate-pulse h-20 bg-slate-50 rounded"></div>}
                     </div>
+
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                         <h3 className="text-sm font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
                             <User size={16}/> 历史相似人物
@@ -205,10 +223,10 @@ export default function App() {
                                         </div>
                                         <div>
                                             <div className="flex justify-between items-center w-full">
-                                                <span className="font-bold text-slate-700">{figure.name}</span>
-                                                <span className="text-xs font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">相似度 {figure.similarity}</span>
+                                                <span className="font-bold text-slate-700"><SafeText content={figure.name}/></span>
+                                                <span className="text-xs font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">相似度 <SafeText content={figure.similarity}/></span>
                                             </div>
-                                            <p className="text-xs text-slate-500 mt-1 leading-relaxed">{figure.reason}</p>
+                                            <p className="text-xs text-slate-500 mt-1 leading-relaxed"><SafeText content={figure.reason}/></p>
                                         </div>
                                     </div>
                                 ))}
@@ -234,10 +252,10 @@ export default function App() {
                     </div>
 
                     <div className="p-8 flex-1">
-                        {aiLoading ? (
+                        {aiLoading && !aiResult ? (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-4">
                                 <Bot size={40} className="animate-bounce text-indigo-300"/>
-                                <p className="animate-pulse">Gemini 正在推算大运流年...</p>
+                                <p className="animate-pulse">大师正在撰写命书...</p>
                             </div>
                         ) : (
                             <>
@@ -245,11 +263,15 @@ export default function App() {
                                     <div className="space-y-6 animate-fade-in-up">
                                         <div>
                                             <h4 className="text-lg font-bold text-slate-800 mb-2">格局深度解析</h4>
-                                            <p className="text-slate-600 leading-relaxed text-justify">{aiResult?.strengthAnalysis}</p>
+                                            <p className="text-slate-600 leading-relaxed text-justify">
+                                                <SafeText content={aiResult?.strengthAnalysis} />
+                                            </p>
                                         </div>
                                         <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
                                             <h4 className="text-emerald-800 font-bold mb-2 flex items-center gap-2"><Activity size={16}/> 健康建议</h4>
-                                            <p className="text-emerald-700 text-sm">{aiResult?.healthAdvice}</p>
+                                            <p className="text-emerald-700 text-sm">
+                                                <SafeText content={aiResult?.healthAdvice} />
+                                            </p>
                                         </div>
                                     </div>
                                 )}
@@ -260,7 +282,7 @@ export default function App() {
                                                 <TrendingUp size={18}/> 2026 丙午流年运势
                                             </h4>
                                             <p className="text-indigo-800 text-base leading-relaxed text-justify">
-                                                {aiResult?.annualLuckAnalysis}
+                                                <SafeText content={aiResult?.annualLuckAnalysis} />
                                             </p>
                                         </div>
                                         <p className="text-xs text-slate-400 text-center">* 运势分析基于原局、大运与流年的五行生克关系推导</p>
@@ -277,9 +299,9 @@ export default function App() {
                                             </div>
                                             <div className="min-h-[100px]">
                                                 {isTranslated ? (
-                                                    <div className="animate-fade-in"><span className="text-xs font-bold text-amber-600 bg-amber-100 px-1 rounded mr-2">白话</span><p className="text-amber-800 text-base leading-8 font-sans inline">{aiResult?.bookAdviceTranslation}</p></div>
+                                                    <div className="animate-fade-in"><span className="text-xs font-bold text-amber-600 bg-amber-100 px-1 rounded mr-2">白话</span><p className="text-amber-800 text-base leading-8 font-sans inline"><SafeText content={aiResult?.bookAdviceTranslation} /></p></div>
                                                 ) : (
-                                                    <div className="animate-fade-in"><span className="text-xs font-bold text-amber-600 bg-amber-100 px-1 rounded mr-2">古文</span><p className="text-amber-900 text-lg leading-8 font-serif-sc inline">{aiResult?.bookAdvice}</p></div>
+                                                    <div className="animate-fade-in"><span className="text-xs font-bold text-amber-600 bg-amber-100 px-1 rounded mr-2">古文</span><p className="text-amber-900 text-lg leading-8 font-serif-sc inline"><SafeText content={aiResult?.bookAdvice} /></p></div>
                                                 )}
                                             </div>
                                         </div>
@@ -289,7 +311,9 @@ export default function App() {
                                     <div className="space-y-6 animate-fade-in-up">
                                          <div>
                                             <h4 className="text-lg font-bold text-slate-800 mb-2">事业发展方向</h4>
-                                            <p className="text-slate-600 leading-relaxed text-justify">{aiResult?.careerAdvice}</p>
+                                            <p className="text-slate-600 leading-relaxed text-justify">
+                                                <SafeText content={aiResult?.careerAdvice} />
+                                            </p>
                                         </div>
                                     </div>
                                 )}
