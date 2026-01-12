@@ -8,7 +8,6 @@ export interface HistoricalFigure {
 
 export interface AIAnalysisResult {
   archetype: string;
-  // ❌ score 字段已移除，因为我们直接用 baziChart.destinyScore
   summary: string;
   appearanceAnalysis: string;
   annualLuckAnalysis: string;
@@ -18,6 +17,7 @@ export interface AIAnalysisResult {
   bookAdviceTranslation: string;
   careerAdvice: string;
   healthAdvice: string;
+  numerologyAnalysis: string; // ✅ 新增：灵数解读字段
 }
 
 export async function analyzeBaziWithAI(chart: BaziChart, currentYear: number = 2026, relations: string[] = []): Promise<AIAnalysisResult> {
@@ -64,6 +64,7 @@ function mockAIResponse(chart: BaziChart, errorMsg: string): AIAnalysisResult {
     bookAdvice: "无法连接。",
     bookAdviceTranslation: "无法连接。",
     careerAdvice: "暂无。",
-    healthAdvice: "暂无。"
+    healthAdvice: "暂无。",
+    numerologyAnalysis: "暂无。"
   };
 }

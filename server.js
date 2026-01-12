@@ -18,7 +18,7 @@ if (!API_KEY) {
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// 自动重试机制 (Google Gemini 专用)
+// 自动重试机制
 async function generateWithRetry(model, prompt, retries = 3, delay = 2000) {
   for (let i = 0; i < retries; i++) {
     try {
@@ -43,7 +43,11 @@ app.post('/api/analyze', async (req, res) => {
     // 数据准备
     const daYunStr = chart.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
     const relationsStr = relations && relations.length > 0 ? relations.join(', ') : "本年无明显冲合";
-    const balanceStr = chart.balanceNote ? chart.balanceNote.join(', ') : "五行平衡"; // ✅ 核心：把诊断结果喂给 AI
+    const balanceStr = chart.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
+    
+    // ✅ 灵数数据准备
+    const lingShu = chart.lingShu || { lifePathNumber: 0, grid: {}, missingNumbers: [] };
+    const missingStr = lingShu.missingNumbers.length > 0 ? lingShu.missingNumbers.join(', ') : "无缺失";
 
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-flash", 
@@ -54,7 +58,6 @@ app.post('/api/analyze', async (req, res) => {
       }
     });
 
-    // ⚡️ 价值观与边界控制 Prompt (Value-Aligned Prompt)
     const prompt = `
       【角色设定】
       你是一位理性、温和且有边界感的资深命理咨询师。你的职责是“解读”命盘信息，帮助用户认知自我、规避风险。
@@ -65,11 +68,6 @@ app.post('/api/analyze', async (req, res) => {
       2. 严禁预测死亡时间、具体疾病名称（如“你会得癌症”）。
       3. 严禁诱导付费或恐吓用户。
 
-      【语言风格】
-      - 建议式：用“建议关注”、“可能倾向于”、“适合考虑”代替“必须”、“一定”。
-      - 建设性：指出问题后，必须给出改善方向（如性格调整、五行互补）。
-      - 现代化：用现代职场、心理学术语解释古籍概念（如“伤官”解释为“创新能力/叛逆”）。
-
       【客观事实 (由系统计算提供)】
       八字: ${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
       日主: ${chart.dayMaster} (${chart.dayMasterElement}) 
@@ -77,7 +75,11 @@ app.post('/api/analyze', async (req, res) => {
       大运: ${daYunStr}
       **命局评分: ${chart.destinyScore}** (这是参考分，请解释为何得此分，但强调后天努力可改变)
       **流年冲合: ${relationsStr}** (请重点分析这些客观存在的能量波动)
-      **五行诊断: ${balanceStr}** (这是代码计算的硬指标，请针对这些过旺或过弱的元素给出调节建议)
+      **五行诊断: ${balanceStr}** (针对过旺或过弱元素给出调节建议)
+      
+      **【灵数分析 (Numerology)】**
+      - 命数 (Life Path): ${lingShu.lifePathNumber}
+      - 缺失数字 (Missing Numbers): ${missingStr} (洛书九宫缺失)
 
       【输出任务 (纯JSON)】
       请返回如下 JSON，内容需符合上述原则：
@@ -91,11 +93,12 @@ app.post('/api/analyze', async (req, res) => {
         "bookAdvice": "穷通宝鉴建议(保留古文风韵)",
         "bookAdviceTranslation": "白话翻译(通俗易懂)",
         "careerAdvice": "事业发展建议(基于十神性格优势)",
-        "healthAdvice": "健康管理建议(基于五行诊断${balanceStr},重点提醒薄弱环节的保养,不可诊断疾病)"
+        "healthAdvice": "健康管理建议(基于五行诊断${balanceStr},不可诊断疾病)",
+        "numerologyAnalysis": "灵数解读(基于命数${lingShu.lifePathNumber}和缺失数字${missingStr}，分析性格优势与需要补足的能量，100字左右)"
       }
     `;
 
-    console.log(`正在请求 AI (顾问模式) 分析 [流年: ${currentYear}]...`);
+    console.log(`正在请求 AI (顾问模式) 分析 [流年: ${currentYear}, 灵数: ${lingShu.lifePathNumber}]...`);
     
     const result = await generateWithRetry(model, prompt);
     const response = await result.response;

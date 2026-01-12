@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, Sparkles, Zap, Scroll, Bot, Menu, ArrowRight, MapPin, Globe, Activity, BookOpen, User, Star, Award, Languages, TrendingUp, Smile, Baby } from 'lucide-react';
+import { Calendar, Clock, Sparkles, Zap, Scroll, Bot, Menu, ArrowRight, MapPin, Globe, Activity, BookOpen, User, Star, Award, Languages, TrendingUp, Smile, Baby, Search, Grid } from 'lucide-react';
 import { FiveElementChart } from './components/FiveElementChart';
 import { calculateBazi, BaziChart, Pillar, ElementType, Gender, getAnnualRelations } from './utils/baziLogic';
 import { analyzeBaziWithAI, AIAnalysisResult } from './utils/geminiService';
 
-// --- 安全渲染组件 ---
 const SafeText = ({ content }: { content: any }) => {
   if (content === null || content === undefined) return null;
   if (typeof content === 'string') return <>{content}</>;
@@ -12,7 +11,6 @@ const SafeText = ({ content }: { content: any }) => {
   return <span className="text-red-400 text-xs">【数据格式异常】{JSON.stringify(content)}</span>;
 };
 
-// --- 子组件：单柱卡片 ---
 const PillarCard = ({ title, pillar, isDayMaster }: { title: string; pillar?: Pillar; isDayMaster?: boolean }) => {
   const getElementColor = (type: ElementType) => {
     switch (type) {
@@ -50,18 +48,40 @@ export default function App() {
   const [time, setTime] = useState<string>("12:00");
   const [longitude, setLongitude] = useState<string>("120");
   const [gender, setGender] = useState<Gender>('male');
+  const [citySearch, setCitySearch] = useState("");
+  const [isSearchingCity, setIsSearchingCity] = useState(false);
   
   const [result, setResult] = useState<BaziChart | null>(null);
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'energy' | 'luck' | 'ancient' | 'career'>('energy');
+  const [activeTab, setActiveTab] = useState<'energy' | 'luck' | 'numerology' | 'ancient' | 'career'>('energy');
   const [isTranslated, setIsTranslated] = useState(false);
 
+  // 🌍 城市自动定位功能
+  const handleCitySearch = async () => {
+    if(!citySearch) return;
+    setIsSearchingCity(true);
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(citySearch)}`);
+        const data = await response.json();
+        if(data && data.length > 0) {
+            const lon = parseFloat(data[0].lon).toFixed(4);
+            setLongitude(lon);
+            alert(`已定位到 ${data[0].display_name.split(',')[0]} (经度: ${lon})`);
+        } else {
+            alert("未找到该城市，请尝试输入英文或更详细的名称");
+        }
+    } catch(e) {
+        alert("定位服务连接失败");
+    } finally {
+        setIsSearchingCity(false);
+    }
+  };
+
   const handleAnalyze = async () => {
-    // 1. 先重置状态
     setLoading(true);
-    setAiLoading(true); // AI 开始加载
+    setAiLoading(true); 
     setSidebarOpen(false); 
     setResult(null);
     setAiResult(null);
@@ -70,28 +90,25 @@ export default function App() {
     let chart: BaziChart;
     try {
         const inputDate = new Date(`${date}T${time}`);
-        // 2. 本地秒算：排盘 + 评分 + 冲合
         chart = calculateBazi(inputDate, longitude, gender);
-        setResult(chart); // ✅ 界面立刻显示圆环和分数
+        setResult(chart); 
     } catch (error) {
         alert("排盘出错了，请检查输入格式或确保依赖已更新");
         setLoading(false); setAiLoading(false);
         return;
     }
-    setLoading(false); // 本地计算完成，Loading 结束
+    setLoading(false);
 
-    // 3. 计算流年关系 (比如 2026 丙午，地支是“午”)
-    const currentYearBranch = '午'; // 2026是午年，这里简化处理。严谨做法可用 lunar-typescript 算流年地支
+    const currentYearBranch = '午'; 
     const relations = getAnnualRelations(chart, currentYearBranch);
 
     try {
-        // 4. 请求 AI (后台慢慢算，前端显示骨架屏)
         const analysis = await analyzeBaziWithAI(chart, 2026, relations);
         setAiResult(analysis);
     } catch (error) {
         console.error("AI 分析失败", error);
     } finally {
-        setAiLoading(false); // AI 结束
+        setAiLoading(false); 
     }
   };
 
@@ -116,7 +133,19 @@ export default function App() {
             </div>
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Calendar size={12}/> 出生日期</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
             <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Clock size={12}/> 出生时间</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
-            <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Globe size={12}/> 出生地经度</label><input type="text" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="如: 103°45'34" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
+            
+            {/* 🌍 城市自动定位输入框 */}
+            <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Search size={12}/> 城市定位 (自动填经度)</label>
+                <div className="flex gap-2">
+                    <input type="text" value={citySearch} onChange={(e) => setCitySearch(e.target.value)} placeholder="输入城市 (如 Shanghai)" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2 px-3 focus:outline-none focus:border-indigo-500 text-sm" />
+                    <button onClick={handleCitySearch} disabled={isSearchingCity} className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg disabled:opacity-50">
+                        {isSearchingCity ? <span className="animate-spin">⏳</span> : <Search size={16}/>}
+                    </button>
+                </div>
+            </div>
+
+            <div className="space-y-2"><label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2"><Globe size={12}/> 出生地经度</label><input type="text" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="如: 103.45" className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg py-2.5 px-3 focus:outline-none focus:border-indigo-500" /></div>
           </div>
           <button onClick={handleAnalyze} disabled={loading || aiLoading} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2 mt-4 hover:opacity-90 disabled:opacity-50">{loading ? <span>排盘中...</span> : aiLoading ? <span>AI思考中...</span> : <>开始排盘 <ArrowRight size={18} /></>}</button>
         </div>
@@ -142,7 +171,6 @@ export default function App() {
                         <span className="text-slate-500 text-xs flex items-center gap-1"><MapPin size={12}/> {result.meta.trueSolarTime} 真太阳时</span>
                         <span className={`text-xs px-2 py-0.5 rounded text-white ${gender==='male'?'bg-indigo-500':'bg-pink-500'}`}>{gender==='male'?'乾造 (男)':'坤造 (女)'}</span>
                     </div>
-                    {/* 骨架屏优化：如果 AI 还没算出名字，显示占位符，而不是空白 */}
                     <h1 className="text-3xl lg:text-5xl font-bold text-slate-800 font-serif mb-2 tracking-tight">
                         {aiResult ? aiResult.archetype : <span className="animate-pulse bg-slate-200 text-transparent rounded">命格计算中...</span>}
                     </h1>
@@ -151,7 +179,6 @@ export default function App() {
                     </p>
                 </div>
                 <div className="flex items-center gap-6">
-                    {/* ✅ 直接显示本地算出的分数 result.destinyScore，不需要等 AI */}
                     <div className="flex flex-col items-center">
                         <div className="relative w-24 h-24 flex items-center justify-center">
                             <svg className="w-full h-full transform -rotate-90">
@@ -243,6 +270,10 @@ export default function App() {
                         <button onClick={() => setActiveTab('luck')} className={`flex-1 py-4 text-sm font-medium whitespace-nowrap px-4 ${activeTab==='luck'?'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50':'text-slate-500'}`}>
                             <TrendingUp size={16} className="inline mr-2"/> 流年运势
                         </button>
+                        {/* 🔢 灵数 Tab */}
+                        <button onClick={() => setActiveTab('numerology')} className={`flex-1 py-4 text-sm font-medium whitespace-nowrap px-4 ${activeTab==='numerology'?'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50':'text-slate-500'}`}>
+                            <Grid size={16} className="inline mr-2"/> 灵数解析
+                        </button>
                         <button onClick={() => setActiveTab('ancient')} className={`flex-1 py-4 text-sm font-medium whitespace-nowrap px-4 ${activeTab==='ancient'?'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50':'text-slate-500'}`}>
                             <BookOpen size={16} className="inline mr-2"/> 穷通宝鉴
                         </button>
@@ -285,9 +316,48 @@ export default function App() {
                                                 <SafeText content={aiResult?.annualLuckAnalysis} />
                                             </p>
                                         </div>
-                                        <p className="text-xs text-slate-400 text-center">* 运势分析基于原局、大运与流年的五行生克关系推导</p>
                                     </div>
                                 )}
+                                
+                                {/* 🔢 灵数内容：九宫格可视化 + AI解读 */}
+                                {activeTab === 'numerology' && (
+                                    <div className="space-y-6 animate-fade-in-up">
+                                        <div className="flex flex-col md:flex-row gap-8">
+                                            {/* 九宫格 Grid */}
+                                            <div className="flex-shrink-0">
+                                                <h4 className="text-sm font-bold text-slate-400 uppercase mb-4 text-center">洛书九宫分布</h4>
+                                                <div className="grid grid-cols-3 gap-2 w-48 h-48 mx-auto bg-slate-100 p-2 rounded-xl">
+                                                    {/* 洛书顺序：4 9 2 / 3 5 7 / 8 1 6 */}
+                                                    {[4,9,2,3,5,7,8,1,6].map(num => {
+                                                        const count = result?.lingShu.grid[num] || 0;
+                                                        return (
+                                                            <div key={num} className={`flex items-center justify-center rounded-lg font-bold text-lg relative ${count > 0 ? 'bg-white text-indigo-600 shadow-sm border border-indigo-100' : 'bg-slate-200 text-slate-400'}`}>
+                                                                {num}
+                                                                {count > 1 && <span className="absolute top-0 right-0 bg-red-500 text-white text-[8px] px-1 rounded-bl-lg">{count}</span>}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                                <div className="text-center mt-4">
+                                                    <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
+                                                        命数: {result?.lingShu.lifePathNumber}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {/* AI 解读 */}
+                                            <div className="flex-1">
+                                                <h4 className="text-lg font-bold text-slate-800 mb-2">灵数能量解读</h4>
+                                                <p className="text-slate-600 leading-relaxed text-justify">
+                                                    <SafeText content={aiResult?.numerologyAnalysis} />
+                                                </p>
+                                                <div className="mt-4 p-3 bg-slate-50 rounded-lg text-xs text-slate-500">
+                                                    * 九宫格中缺失的数字代表性格盲点或需补足的能量，重复的数字代表天赋优势。
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {activeTab === 'ancient' && (
                                     <div className="space-y-6 animate-fade-in-up">
                                         <div className="p-6 bg-amber-50 border border-amber-100 rounded-xl">

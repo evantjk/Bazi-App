@@ -37,6 +37,13 @@ export interface DaYun {
   endYear: number;
 }
 
+// ✅ 新增：灵数接口
+export interface LingShu {
+  lifePathNumber: number; // 命数 (1-9)
+  grid: Record<number, number>; // 九宫格分布 {1: 2, 2: 0, ...} 记录每个数字出现的次数
+  missingNumbers: number[]; // 缺失的数字
+}
+
 export interface BaziChart {
   meta: {
     solarDate: string;
@@ -58,9 +65,9 @@ export interface BaziChart {
   strength: string;
   seasonStatus: string;
   strongestElement: ElementType;
-  // ✅ 新增：把“诊断权”收回代码
   weakestElement: ElementType; 
-  balanceNote: string[]; // 例如 ["火太旺(风险)", "缺水(需补)"]
+  balanceNote: string[];
+  lingShu: LingShu; // ✅ 新增：灵数数据
 }
 
 // --- Constants ---
@@ -128,24 +135,54 @@ function getEquationOfTime(date: Date): number {
   return 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
 }
 
-// 计算流年冲合
 export function getAnnualRelations(chart: BaziChart, currentYearBranch: string): string[] {
     const relations: string[] = [];
     const branches = [chart.year.branch, chart.month.branch, chart.day.branch, chart.hour.branch];
     const positions = ["年", "月", "日", "时"];
-    
     const clashes: Record<string, string> = {
         '子': '午', '午': '子', '丑': '未', '未': '丑', '寅': '申', '申': '寅', 
         '卯': '酉', '酉': '卯', '辰': '戌', '戌': '辰', '巳': '亥', '亥': '巳'
     };
-
     branches.forEach((b, idx) => {
         if (clashes[b] === currentYearBranch) {
             relations.push(`${b}${currentYearBranch}冲 (${positions[idx]}柱)`);
         }
     });
-
     return relations;
+}
+
+// ✅ 新增：计算灵数逻辑
+function calculateLingShu(date: Date): LingShu {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    
+    // 1. 提取所有数字 (YYYYMMDD)
+    const dateStr = `${year}${month < 10 ? '0'+month : month}${day < 10 ? '0'+day : day}`;
+    const digits = dateStr.split('').map(Number);
+    
+    // 2. 计算命数 (Life Path Number) - 递归相加直到个位数
+    let sum = digits.reduce((a, b) => a + b, 0);
+    while (sum > 9) {
+        sum = sum.toString().split('').reduce((a, b) => parseInt(a) + parseInt(b), 0);
+    }
+    const lifePathNumber = sum;
+
+    // 3. 计算九宫格分布 (Lo Shu Grid)
+    const grid: Record<number, number> = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0};
+    const missingNumbers: number[] = [];
+    
+    // 统计出生日期里的数字
+    digits.forEach(d => {
+        if (d >= 1 && d <= 9) grid[d]++;
+    });
+
+    // 统计缺失的数字
+    for (let i = 1; i <= 9; i++) {
+        if (grid[i] === 0) missingNumbers.push(i);
+    }
+
+    return { lifePathNumber, grid, missingNumbers };
 }
 
 // --- Main Logic ---
@@ -210,12 +247,10 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
   const scores = calculateScores(yearPillar, monthPillar, dayPillar, hourPillar);
   const strengthResult = calculateStrengthAdvanced(scores, dayMasterDetail.element, seasonStatus, monthBranchDetail.element);
   
-  // 找最强最弱
   const sortedElements = (Object.keys(scores) as ElementType[]).sort((a, b) => scores[b] - scores[a]);
   const strongestEl = sortedElements[0];
   const weakestEl = sortedElements[sortedElements.length - 1];
 
-  // ✅ 系统级诊断：生成“风险/平衡”标签 (Risk Tags)
   const balanceNote: string[] = [];
   Object.entries(scores).forEach(([el, score]) => {
       const name = ELEMENT_CN_MAP[el as ElementType];
@@ -232,6 +267,9 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
   const tstStr = `${trueSolarDate.getHours().toString().padStart(2, '0')}:${trueSolarDate.getMinutes().toString().padStart(2, '0')}`;
   const eotDisplay = eotMinutes > 0 ? `+${eotMinutes.toFixed(1)}m` : `${eotMinutes.toFixed(1)}m`;
   const longOffsetDisplay = `${longOffsetMinutes.toFixed(1)}m`;
+
+  // ✅ 计算灵数
+  const lingShu = calculateLingShu(inputDate);
 
   return {
     meta: {
@@ -250,8 +288,9 @@ export function calculateBazi(inputDate: Date, longitudeStr: string, gender: Gen
     strength: strengthResult.desc,
     seasonStatus: seasonStatus,
     strongestElement: strongestEl,
-    weakestElement: weakestEl, // ✅ 导出最弱
-    balanceNote // ✅ 导出诊断结果
+    weakestElement: weakestEl,
+    balanceNote,
+    lingShu // ✅ 导出
   };
 }
 
