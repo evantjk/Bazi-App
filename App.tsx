@@ -17,9 +17,12 @@ import {
 } from './utils/geminiService';
 
 // --- 安全文本组件 ---
+// 允许长文本换行显示，增加 whitespace-pre-wrap
 const SafeText = ({ content }: { content: any }) => {
-  if (content === null || content === undefined) return null;
-  if (typeof content === 'string') return <>{content}</>;
+  if (!content) return null;
+  if (typeof content === 'string') {
+      return <span className="whitespace-pre-wrap">{content}</span>;
+  }
   return <span className="text-red-400 text-xs">...</span>;
 };
 
@@ -414,7 +417,7 @@ export default function App() {
 
                     {/* 4. 灵数解析 */}
                     {activeTab === 'numerology' && (
-                        <div className="flex gap-8 flex-col md:flex-row">
+                        <div className="flex gap-8">
                             <div className="grid grid-cols-3 gap-1 w-32 h-32 bg-slate-100 p-1 rounded flex-shrink-0">
                                 {[4,9,2,3,5,7,8,1,6].map(n => (
                                     <div key={n} className={`flex items-center justify-center rounded ${result.lingShu?.grid[n] ? 'bg-indigo-500 text-white' : 'text-slate-300'}`}>{n}</div>
@@ -422,7 +425,7 @@ export default function App() {
                             </div>
                             <div className="flex-1">
                                 <h4 className="font-bold mb-2">命数: {result.lingShu?.lifePathNumber}</h4>
-                                <p className="text-sm text-slate-600 leading-relaxed text-justify"><SafeText content={aiResult?.numerologyAnalysis}/></p>
+                                <p className="text-sm text-slate-600 leading-relaxed"><SafeText content={aiResult?.numerologyAnalysis}/></p>
                             </div>
                         </div>
                     )}
@@ -462,7 +465,7 @@ export default function App() {
                                         <p className="font-bold mb-1">风险：</p><p><SafeText content={qimenAI?.riskAlert}/></p>
                                     </div>
                                 </div>
-                            ) : <p className="text-slate-400">请在左侧侧边栏使用奇门决策功能</p>}
+                            ) : <p className="text-slate-400">请在左侧使用奇门决策</p>}
                         </div>
                     )}
                 </div>
