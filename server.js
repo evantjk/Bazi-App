@@ -18,8 +18,21 @@ if (!API_KEY) {
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-const MODEL_MAIN = "gemini-2.5-flash";
-const MODEL_BACKUP = "gemini-1.5-flash";
+// ---------------------------------------------------------
+// 🤖 模型配置 (Model Configuration)
+// ---------------------------------------------------------
+
+// 👑 顶级模型 (需要用户手动点击按钮激活)
+const MODEL_ULTRA = "gemini-3-pro-preview";
+
+// ⛓️ 自动降级链 (优先使用列表顶部的模型)
+// 逻辑：3-Flash (最快最新) -> 2.5-Pro (性能强) -> 2.5-Flash (均衡) -> 2.5-Lite (保底)
+const MODELS_CHAIN = [
+    "gemini-3-flash-preview",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite"
+];
 
 // 🛡️ 智能 JSON 提取器
 function extractJSON(str) {
@@ -30,152 +43,124 @@ function extractJSON(str) {
   let endIndex = -1;
   
   for (let i = startIndex; i < str.length; i++) {
-    if (str[i] === '{') {
-      braceCount++;
-    } else if (str[i] === '}') {
+    if (str[i] === '{') braceCount++;
+    else if (str[i] === '}') {
       braceCount--;
-      if (braceCount === 0) {
-        endIndex = i;
-        break;
-      }
+      if (braceCount === 0) { endIndex = i; break; }
     }
   }
-  
-  if (endIndex !== -1) {
-    return str.substring(startIndex, endIndex + 1);
-  }
-  return null;
+  return endIndex !== -1 ? str.substring(startIndex, endIndex + 1) : null;
 }
 
 // 基础生成函数
 async function generateOnce(modelName, prompt) {
-    const model = genAI.getGenerativeModel({ 
-        model: modelName,
-        generationConfig: {
-            temperature: 0.4, // 稍微降低随机性，保证格式稳定
-            topP: 0.8,
-            topK: 40,
-        }
-    });
+    console.log(`📡 请求模型: ${modelName}...`);
+    const model = genAI.getGenerativeModel({ model: modelName });
     const result = await model.generateContent(prompt);
     return result.response.text();
 }
 
-// 智能降级策略
-async function generateSmartResponse(prompt) {
-    const maxRetriesMain = 4;
-    for (let i = 0; i < maxRetriesMain; i++) {
+// 🧠 智能路由与降级策略
+async function generateSmartResponse(prompt, usePro = false) {
+    // 1. 如果用户开启了 "Pro 模式"，优先尝试 Gemini 3 Pro
+    if (usePro) {
         try {
-            console.log(`🚀 [主力] 尝试调用 ${MODEL_MAIN} (第 ${i + 1}/${maxRetriesMain} 次)...`);
-            const text = await generateOnce(MODEL_MAIN, prompt);
-            return { text, modelUsed: MODEL_MAIN };
+            console.log(`🌟 [Pro模式] 正在调用顶级模型 ${MODEL_ULTRA}...`);
+            const text = await generateOnce(MODEL_ULTRA, prompt);
+            return { text, modelUsed: MODEL_ULTRA };
         } catch (error) {
-            const isOverloaded = error.message.includes('503') || error.message.includes('overloaded');
-            console.warn(`⚠️ [主力] ${MODEL_MAIN} 失败: ${error.message}`);
-            if (i < maxRetriesMain - 1) {
-                const delay = 2000 * Math.pow(2, i);
-                await new Promise(r => setTimeout(r, delay));
+            console.warn(`⚠️ [Pro模式] ${MODEL_ULTRA} 暂时不可用 (${error.message})，自动切换至标准链路...`);
+            // 如果 Pro 失败，不报错，而是自动落入下方的标准链条，保证用户能拿到结果
+        }
+    }
+
+    // 2. 标准自动降级链 (Auto Fallback Chain)
+    for (let i = 0; i < MODELS_CHAIN.length; i++) {
+        const modelName = MODELS_CHAIN[i];
+        
+        // 每个模型尝试 2 次 (避免因网络抖动直接跳过好模型)
+        const retriesPerModel = 2; 
+        
+        for (let j = 0; j < retriesPerModel; j++) {
+            try {
+                if (j > 0) console.log(`   🔄 ${modelName} 重试第 ${j+1} 次...`);
+                const text = await generateOnce(modelName, prompt);
+                return { text, modelUsed: modelName }; // 成功！
+            } catch (error) {
+                const isOverloaded = error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('429');
+                console.warn(`❌ ${modelName} (尝试 ${j+1}/${retriesPerModel}) 失败: ${error.message.split(' ')[0]}`);
+                
+                // 如果是服务器过载，等待一下再试；如果是其他错误(如404)，直接跳过该模型
+                if (isOverloaded && j < retriesPerModel - 1) {
+                    await new Promise(r => setTimeout(r, 1500)); 
+                } else {
+                    break; // 停止重试当前模型，进入下一个模型
+                }
             }
         }
     }
 
-    const maxRetriesBackup = 2;
-    for (let i = 0; i < maxRetriesBackup; i++) {
-        try {
-            console.log(`🛡️ [替补] 正在切换至 ${MODEL_BACKUP} (第 ${i + 1}/${maxRetriesBackup} 次)...`);
-            const text = await generateOnce(MODEL_BACKUP, prompt);
-            return { text, modelUsed: MODEL_BACKUP };
-        } catch (error) {
-            console.error(`❌ [替补] ${MODEL_BACKUP} 也失败了`);
-            if (i < maxRetriesBackup - 1) await new Promise(r => setTimeout(r, 2000));
-        }
-    }
-    throw new Error("所有 AI 模型（主力+替补）均不可用，请稍后再试。");
+    throw new Error("所有 AI 模型均繁忙，请稍后重试。");
 }
 
-// 八字分析接口
+// ---------------------------------------------------------
+// 🔮 API Endpoints
+// ---------------------------------------------------------
+
+// 1. 八字 API
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { chart, currentYear } = req.body; 
+    const { chart, currentYear, useProModel } = req.body; // 接收 useProModel 参数
+    
     const daYunStr = chart?.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
     const balanceStr = chart?.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
     const lingShu = chart?.lingShu || { lifePathNumber: 0 };
 
-    // 🔥 增强版 Prompt：强制 5 人，强制深度，强制古籍
     const prompt = `
-      【角色设定】
-      你是一位精通《三命通会》、《穷通宝鉴》的资深命理大师。你的风格是**深度、详尽、引经据典**。
-      
-      【语言要求】
-      1. 全程使用**简体中文**。
-      2. 除非是专有名词，否则不要出现英文。
-
-      【分析对象】
+      【角色】资深中文命理大师 (精通三命通会/穷通宝鉴)。
+      【要求】简体中文，深度详尽，专业术语需解释。
+      【数据】
       八字: ${chart.year.stem}${chart.year.branch} ${chart.month.stem}${chart.month.branch} ${chart.day.stem}${chart.day.branch} ${chart.hour.stem}${chart.hour.branch}
-      日主: ${chart.dayMaster} 格局: ${chart.strength}
-      大运: ${daYunStr}
-      五行诊断: ${balanceStr}
-      灵数命数: ${lingShu.lifePathNumber}
-
-      【输出任务 (必须严格遵循此JSON格式，不要Markdown)】
+      日主: ${chart.dayMaster} 格局: ${chart.strength} 大运: ${daYunStr} 评分: ${chart.destinyScore}
+      
+      【任务 JSON】
       {
-        "archetype": "命格赐名(4字, 如金水相涵)",
-        "summary": "30字精评(一针见血)",
-        "appearanceAnalysis": "容貌气质描述(基于五行/麻衣神相, 100字)",
-        "annualLuckAnalysis": "${currentYear}年流年运势(结合大运, 详细分析事业、财运、感情变化)",
-        
-        "historicalFigures": [
-            {"name": "名人1", "similarity": "相似度", "reason": "对比分析"},
-            {"name": "名人2", "similarity": "相似度", "reason": "对比分析"},
-            {"name": "名人3", "similarity": "相似度", "reason": "对比分析"},
-            {"name": "名人4", "similarity": "相似度", "reason": "对比分析"},
-            {"name": "名人5", "similarity": "相似度", "reason": "对比分析"}
-        ],
-        // ⚠️ 必须列出 5 位！少于 5 位视为失败。
-        
-        "strengthAnalysis": "格局深度解析。详细分析日主强弱、喜用神、格局高低。字数不少于300字，要有深度。",
-        
-        "bookAdvice": "古籍建议(必须引用《穷通宝鉴》或《三命通会》的原文)",
-        "bookAdviceTranslation": "古文的白话文深度解析(不仅仅是翻译，要有结合命主的解读)",
-        
-        "careerAdvice": "事业发展建议(具体到行业和职能)",
-        "healthAdvice": "健康管理建议",
-        
-        "numerologyAnalysis": "灵数${lingShu.lifePathNumber}深度解读：包含性格优势、潜在挑战、人生使命。"
+        "archetype": "命格赐名(4字)", "summary": "30字精评",
+        "appearanceAnalysis": "容貌气质(100字)",
+        "annualLuckAnalysis": "${currentYear}年流年运势(结合大运)",
+        "historicalFigures": [{"name":"名人","similarity":"85%","reason":"对比"}],
+        "strengthAnalysis": "格局深度解析(300字+)",
+        "bookAdvice": "古籍建议", "bookAdviceTranslation": "白话解析",
+        "careerAdvice": "事业建议", "healthAdvice": "健康建议", "numerologyAnalysis": "灵数解读"
       }
     `;
 
-    console.log("正在请求 AI (八字深度版)...");
-    const { text, modelUsed } = await generateSmartResponse(prompt);
-    
+    const { text, modelUsed } = await generateSmartResponse(prompt, useProModel);
     const jsonStr = extractJSON(text);
-    if (!jsonStr) throw new Error(`AI (${modelUsed}) 返回数据格式异常`);
-
-    const data = JSON.parse(jsonStr);
-    res.set('X-Model-Used', modelUsed);
-    res.json(data);
+    if (!jsonStr) throw new Error(`AI (${modelUsed}) 数据格式异常`);
+    res.set('X-Model-Used', modelUsed).json(JSON.parse(jsonStr));
 
   } catch (error) {
-    console.error("API 错误:", error.message);
-    res.status(503).json({ error: "分析服务繁忙，正在为您排队，请稍后再试！" });
+    res.status(503).json({ error: "服务器正忙，请稍等 5 秒后再试！" });
   }
 });
 
-// 奇门决策接口
+// 2. 奇门 API
 app.post('/api/qimen', async (req, res) => {
   try {
-    const { type, context, result } = req.body; 
+    const { type, context, result, useProModel } = req.body;
     const signalMap = { 'green': '🟢 可行动', 'yellow': '🟡 需观察', 'red': '🔴 不建议' };
+    
     const prompt = `
       角色：奇门决策顾问。语言：简体中文。
       问题：${type} 背景：${context || "无"}
       信号：${signalMap[result.signal]} 判词：${result.summary} 因子：${result.factors.join(', ')}
-      输出JSON: { "mainTendency": "核心判断", "reasoning": ["原因1", "原因2"], "actionAdvice": "行动建议", "riskAlert": "风险提示" }
+      输出JSON: { "mainTendency": "核心判断", "reasoning": ["原因"], "actionAdvice": "建议", "riskAlert": "风险" }
     `;
     
-    const { text, modelUsed } = await generateSmartResponse(prompt);
+    const { text, modelUsed } = await generateSmartResponse(prompt, useProModel);
     const jsonStr = extractJSON(text);
-    if (!jsonStr) throw new Error(`AI (${modelUsed}) 格式异常`);
+    if (!jsonStr) throw new Error(`AI (${modelUsed}) 数据异常`);
     res.set('X-Model-Used', modelUsed).json(JSON.parse(jsonStr));
 
   } catch (error) {
@@ -183,7 +168,35 @@ app.post('/api/qimen', async (req, res) => {
   }
 });
 
+// 3. 紫微 API
+app.post('/api/ziwei', async (req, res) => {
+  try {
+    const { chart, useProModel } = req.body;
+    const lifePalace = chart.palaces[chart.lifePalaceIndex];
+    const getStars = (p) => p.majorStars.map(s => s.name).join(',') || "无主星";
+
+    const prompt = `
+      角色：钦天监紫微斗数大师。语言：简体中文。
+      信息：局数${chart.element}, 命宫${lifePalace.earthlyBranch}有[${getStars(lifePalace)}]。
+      任务：三方四正深度解读。
+      输出JSON: {
+        "pattern": "格局名称", "lifeAnalysis": "命宫解析(200字)",
+        "wealthAnalysis": "财运", "careerAnalysis": "事业", "loveAnalysis": "感情"
+      }
+    `;
+
+    const { text, modelUsed } = await generateSmartResponse(prompt, useProModel);
+    const jsonStr = extractJSON(text);
+    if (!jsonStr) throw new Error(`AI (${modelUsed}) 数据异常`);
+    res.set('X-Model-Used', modelUsed).json(JSON.parse(jsonStr));
+
+  } catch (error) {
+    res.status(503).json({ error: "紫微服务繁忙，请稍后再试。" });
+  }
+});
+
 app.listen(port, () => {
   console.log(`✅ 后端服务器已启动: http://localhost:${port}`);
-  console.log(`   - 主力: ${MODEL_MAIN} | 替补: ${MODEL_BACKUP}`);
+  console.log(`   💎 旗舰模型 (按钮激活): ${MODEL_ULTRA}`);
+  console.log(`   ⛓️ 自动降级链: ${MODELS_CHAIN.join(' -> ')}`);
 });
