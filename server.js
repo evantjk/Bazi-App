@@ -77,7 +77,7 @@ async function generateSmartResponse(prompt, usePro = false) {
     // 2. 标准链 (已调整顺序：2.5 Pro 优先)
     for (let i = 0; i < MODELS_CHAIN.length; i++) {
         const modelName = MODELS_CHAIN[i];
-        const retries = 2; 
+        const retries = 5; 
         
         for (let j = 0; j < retries; j++) {
             try {
