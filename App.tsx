@@ -349,7 +349,7 @@ export default function App() {
                                 ))}
                             </div>
                             <div className="flex-1">
-                                <h4 className="font-bold mb-2">命数: {result.lingShu?.lifePathNumber}</h4>
+                                <h4 className="font-bold mb-2">灵数: {result.lingShu?.lifePathNumber}</h4>
                                 <p className="text-sm text-slate-600 leading-relaxed"><SafeText content={aiResult?.numerologyAnalysis}/></p>
                             </div>
                         </div>
