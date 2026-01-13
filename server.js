@@ -30,9 +30,7 @@ const MODEL_ULTRA = "gemini-3-pro-preview";
 // 策略：3-Flash (最新极速) -> 2.5-Pro (深度稳健) -> 2.5-Flash (均衡)
 const MODELS_CHAIN = [
     "gemini-2.5-pro", 
-    "gemini-3-flash-preview",
-    "gemini-2.0-flash",        // ⚖️ 优先级 3: 2.0 稳定版
-    "gemini-2.5-flash-preview-09-2025" // 🧱 优先级 4: 兜底
+   
 ];
 
 // 🛡️ 智能 JSON 提取器
