@@ -22,17 +22,17 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 // 🤖 模型架构配置 (Model Configuration)
 // ---------------------------------------------------------
 
-// 👑 旗舰模型 (前端点击 "Pro 按钮" 时触发)
-// 3-Pro 目前是逻辑天花板
+// 👑 旗舰模型 (前端点击 "Gemini 3 Pro" 按钮时触发)
+// 逻辑天花板，用于处理最复杂的命理推理
 const MODEL_ULTRA = "gemini-3-pro-preview";
 
-// ⛓️ 自动降级链 (按您的要求重新排序)
-// 策略：优先 2.5-Pro (稳重、深度) -> 3-Flash (极速) -> 2.5-Flash (均衡)
+// ⛓️ 自动降级链 (默认使用，按优先级排序)
+// 策略：3-Flash (最新极速) -> 2.5-Pro (深度稳健) -> 2.5-Flash (均衡)
 const MODELS_CHAIN = [
-    "gemini-2.5-pro",          // 🛡️ 优先级 1: 逻辑最强，虽然稍慢但废话少，分析深
-    "gemini-3-flash-preview",  // 🚀 优先级 2: 最新极速
-    "gemini-2.5-flash",        // ⚖️ 优先级 3: 稳定保底
-    "gemini-2.5-flash-lite"    // 🧱 优先级 4: 轻量保底
+    "gemini-2.5-pro", 
+    "gemini-3-flash-preview",
+    "gemini-2.0-flash",        // ⚖️ 优先级 3: 2.0 稳定版
+    "gemini-2.5-flash-preview-09-2025" // 🧱 优先级 4: 兜底
 ];
 
 // 🛡️ 智能 JSON 提取器
@@ -56,14 +56,21 @@ function extractJSON(str) {
 // 基础生成函数
 async function generateOnce(modelName, prompt) {
     console.log(`📡 请求模型: ${modelName}...`);
-    const model = genAI.getGenerativeModel({ model: modelName });
+    const model = genAI.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+        }
+    });
     const result = await model.generateContent(prompt);
     return result.response.text();
 }
 
 // 🧠 智能路由与降级策略
 async function generateSmartResponse(prompt, usePro = false) {
-    // 1. Pro 模式
+    // 1. Pro 模式 (手动激活 3-Pro)
     if (usePro) {
         try {
             console.log(`🌟 [Pro模式] 调用旗舰模型 ${MODEL_ULTRA}...`);
@@ -74,9 +81,10 @@ async function generateSmartResponse(prompt, usePro = false) {
         }
     }
 
-    // 2. 标准链 (已调整顺序：2.5 Pro 优先)
+    // 2. 标准自动链
     for (let i = 0; i < MODELS_CHAIN.length; i++) {
         const modelName = MODELS_CHAIN[i];
+        // 每个模型尝试 2 次
         const retries = 5; 
         
         for (let j = 0; j < retries; j++) {
@@ -85,12 +93,13 @@ async function generateSmartResponse(prompt, usePro = false) {
                 const text = await generateOnce(modelName, prompt);
                 return { text, modelUsed: modelName };
             } catch (error) {
-                const isBusy = error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('429');
+                const isBusy = error.message.includes('503') || error.message.includes('overloaded');
                 console.warn(`❌ ${modelName} 失败: ${error.message.split(' ')[0]}`);
+                
                 if (isBusy && j < retries - 1) {
                     await new Promise(r => setTimeout(r, 1500)); 
                 } else {
-                    break;
+                    break; // 非繁忙错误直接跳过
                 }
             }
         }
@@ -100,7 +109,7 @@ async function generateSmartResponse(prompt, usePro = false) {
 }
 
 // ---------------------------------------------------------
-// 🔮 API Endpoints (Prompt 深度大修)
+// 🔮 API Endpoints (深度 Prompt)
 // ---------------------------------------------------------
 
 // 1. 八字 API
@@ -112,7 +121,6 @@ app.post('/api/analyze', async (req, res) => {
     const balanceStr = chart?.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
     const lingShu = chart?.lingShu || { lifePathNumber: 0 };
 
-    // 🔥 终极指令：强制分段、强制字数、修正灵数逻辑
     const prompt = `
       【角色】资深命理宗师（文风稳重、详尽、逻辑严密，拒绝简略）。
       【要求】简体中文。所有专业术语必须解释。
@@ -156,11 +164,7 @@ app.post('/api/analyze', async (req, res) => {
     const jsonStr = extractJSON(text);
     if (!jsonStr) throw new Error(`AI (${modelUsed}) 数据格式异常`);
     
-    // 再次检查名人数量，如果少于5个，在日志警告
-    const data = JSON.parse(jsonStr);
-    if (!data.historicalFigures || data.historicalFigures.length < 5) console.warn("AI 偷懒了，名人少于5个");
-
-    res.set('X-Model-Used', modelUsed).json(data);
+    res.set('X-Model-Used', modelUsed).json(JSON.parse(jsonStr));
 
   } catch (error) {
     res.status(503).json({ error: "服务器正忙，请稍等 5 秒后再试！" });
@@ -220,5 +224,5 @@ app.post('/api/ziwei', async (req, res) => {
 app.listen(port, () => {
   console.log(`✅ 后端服务器已启动: http://localhost:${port}`);
   console.log(`   💎 旗舰模型: ${MODEL_ULTRA}`);
-  console.log(`   ⛓️ 自动降级链: ${MODELS_CHAIN.join(' -> ')} (2.5 Pro 优先)`);
+  console.log(`   ⛓️ 自动降级链: ${MODELS_CHAIN.join(' -> ')}`);
 });
