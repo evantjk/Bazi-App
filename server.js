@@ -30,7 +30,7 @@ const MODEL_ULTRA = "gemini-3-pro-preview";
 // 策略：3-Flash (最新极速) -> 2.5-Pro (深度稳健) -> 2.5-Flash (均衡)
 const MODELS_CHAIN = [
     "gemini-2.5-pro", 
-   
+    "gemini-3-flash-preview"
 ];
 
 // 🛡️ 智能 JSON 提取器
@@ -57,7 +57,7 @@ async function generateOnce(modelName, prompt) {
     const model = genAI.getGenerativeModel({ 
         model: modelName,
         generationConfig: {
-            temperature: 0.7,
+            temperature: 1.0,
             topK: 40,
             topP: 0.95,
         }
@@ -83,7 +83,7 @@ async function generateSmartResponse(prompt, usePro = false) {
     for (let i = 0; i < MODELS_CHAIN.length; i++) {
         const modelName = MODELS_CHAIN[i];
         // 每个模型尝试 2 次
-        const retries = 5; 
+        const retries = 10; 
         
         for (let j = 0; j < retries; j++) {
             try {
@@ -132,7 +132,7 @@ app.post('/api/analyze', async (req, res) => {
 
       【输出任务 JSON】
       {
-        "archetype": "命格赐名(4字)",
+        "archetype": "命格赐名",
         "summary": "30字精评",
         "appearanceAnalysis": "容貌气质(100字)",
         "annualLuckAnalysis": "${currentYear}年流年运势(300字，结合大运流年)",
@@ -154,7 +154,7 @@ app.post('/api/analyze', async (req, res) => {
         
         "healthAdvice": "健康深度建议（200字）。请指出五行过旺或过弱对应的具体器官隐患，并给出中医调理建议。",
         
-        "numerologyAnalysis": "灵数与命理融合（严禁混淆概念）。请分两步分析：\\n1. **灵数本义**：先解释西方灵数${lingShu.lifePathNumber}号人的性格天赋（如1号领导者、5号自由者）。\\n2. **命理互补**：再分析这种性格对八字格局是'雪中送炭'还是'火上浇油'，并给出建议。"
+        "numerologyAnalysis": "灵数与命理融合（严禁混淆概念）。请分两步分析：\\n1. **灵数本义**：先解释西方灵数${lingShu.lifePathNumber}号人的性格天赋（如1号领导者、5号自由者）。"\\n2. 灵数深度分析： 增加更多解释和分析。"
       }
     `;
 
