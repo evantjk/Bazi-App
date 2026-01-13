@@ -13,7 +13,7 @@ import {
   ZiweiAIResult 
 } from './utils/geminiService';
 
-// --- API Service (必须包含，否则 fetch 报错) ---
+// --- API Service (修复：确保 fetchAPI 定义存在) ---
 async function fetchAPI<T>(endpoint: string, body: any): Promise<T> {
     try {
         const response = await fetch(endpoint, {
@@ -52,7 +52,7 @@ const PillarCard = ({ title, pillar, isDayMaster }: any) => {
     }
   };
 
-  if (!pillar) return <div className="h-56 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400">...</div>;
+  if (!pillar) return <div className="h-56 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400">等待排盘...</div>;
 
   return (
     <div className={`flex flex-col items-center bg-white rounded-xl shadow-sm border p-3 lg:p-4 relative overflow-hidden ${pillar.kongWang ? 'border-dashed border-slate-300 bg-slate-50/50' : 'border-slate-100'}`}>
@@ -82,7 +82,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Settings
-  const [useProModel, setUseProModel] = useState(false); // ⚡️ Pro 模式开关
+  const [useProModel, setUseProModel] = useState(false); 
 
   // Input
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -135,11 +135,10 @@ export default function App() {
         const ziweiObj = calculateZiwei(inputDate);
         setZiweiResult(ziweiObj);
 
-        setLoading(false); // 本地计算结束
-        setAiLoading(true); // AI 计算开始
+        setLoading(false); 
+        setAiLoading(true); 
 
         // 2. AI 分析
-        // ⚠️ 关键点：将 useProModel 传递给后端
         Promise.all([
             fetchAPI<AIAnalysisResult>('/api/analyze', { chart: baziObj, currentYear: 2026, useProModel })
                 .then(setAiResult),
@@ -200,12 +199,10 @@ export default function App() {
                 <label className="text-xs font-semibold text-slate-400 uppercase">性别</label>
                 <div className="flex bg-slate-800 rounded-lg p-1"><button onClick={() => setGender('male')} className={`flex-1 py-1.5 rounded ${gender==='male'?'bg-indigo-600':''}`}>男</button><button onClick={() => setGender('female')} className={`flex-1 py-1.5 rounded ${gender==='female'?'bg-pink-600':''}`}>女</button></div>
              </div>
-             
              <div className="flex gap-2">
                 <input type="text" value={citySearch} onChange={(e) => setCitySearch(e.target.value)} placeholder="如 上海" className="w-full bg-slate-800 border border-slate-700 rounded-lg py-2 px-3 text-sm text-white" />
                 <button onClick={handleCitySearch} disabled={isSearchingCity} className="bg-indigo-600 text-white p-2 rounded-lg">{isSearchingCity ? '...' : <Search size={16}/>}</button>
              </div>
-
              <input type="text" value={longitude} onChange={e=>setLongitude(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded p-2" placeholder="经度"/>
              <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded p-2"/>
              <input type="time" value={time} onChange={e=>setTime(e.target.value)} className="w-full bg-slate-800 border border-slate-700 text-white rounded p-2"/>
