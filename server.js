@@ -18,8 +18,11 @@ if (!API_KEY) {
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// 🛡️ 智能 JSON 提取器 (核心修复：解决 'Unexpected non-whitespace' 报错)
-// 通过计算花括号的层级，精准提取第一个完整的 JSON 对象，忽略结尾的废话
+// 定义两个模型：主力(2.5) 和 替补(1.5)
+const MODEL_MAIN = "gemini-2.5-flash";
+const MODEL_BACKUP = "gemini-1.5-flash";
+
+// 🛡️ 智能 JSON 提取器
 function extractJSON(str) {
   let startIndex = str.indexOf('{');
   if (startIndex === -1) return null;
@@ -45,22 +48,52 @@ function extractJSON(str) {
   return null;
 }
 
-// 自动重试机制 (针对 503 Overloaded)
-async function generateWithRetry(model, prompt, retries = 5, delay = 3000) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await model.generateContent(prompt);
-    } catch (error) {
-      const isTransientError = error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('429');
-      if (isTransientError && i < retries - 1) {
-        console.warn(`⚠️ Google 服务器繁忙 (503)，正在进行第 ${i + 1}/${retries} 次重试...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2; 
-      } else {
-        throw error;
-      }
+// 基础生成函数 (单次尝试)
+async function generateOnce(modelName, prompt) {
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+}
+
+// 🧠 智能降级策略核心函数
+// 逻辑：尝试主力模型 N 次 -> 失败 -> 尝试替补模型 M 次
+async function generateSmartResponse(prompt) {
+    // 阶段一：主力冲锋 (2.5 Flash) - 尝试 4 次
+    const maxRetriesMain = 4;
+    for (let i = 0; i < maxRetriesMain; i++) {
+        try {
+            console.log(`🚀 [主力] 尝试调用 ${MODEL_MAIN} (第 ${i + 1}/${maxRetriesMain} 次)...`);
+            const text = await generateOnce(MODEL_MAIN, prompt);
+            return { text, modelUsed: MODEL_MAIN }; // 成功返回
+        } catch (error) {
+            const isOverloaded = error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('429');
+            console.warn(`⚠️ [主力] ${MODEL_MAIN} 失败: ${error.message}`);
+            
+            if (i < maxRetriesMain - 1) {
+                // 如果还有重试机会，等待后继续
+                const delay = 2000 * Math.pow(2, i); // 指数退避: 2s, 4s, 8s
+                await new Promise(r => setTimeout(r, delay));
+            } else {
+                console.warn(`🔥 [主力] ${MODEL_MAIN} 全部尝试失败，准备切换替补模型...`);
+            }
+        }
     }
-  }
+
+    // 阶段二：替补兜底 (1.5 Flash) - 尝试 2 次
+    // 如果主力全挂了，1.5 通常很稳，不需要试太多次
+    const maxRetriesBackup = 2;
+    for (let i = 0; i < maxRetriesBackup; i++) {
+        try {
+            console.log(`🛡️ [替补] 正在切换至 ${MODEL_BACKUP} (第 ${i + 1}/${maxRetriesBackup} 次)...`);
+            const text = await generateOnce(MODEL_BACKUP, prompt);
+            return { text, modelUsed: MODEL_BACKUP }; // 降级成功
+        } catch (error) {
+            console.error(`❌ [替补] ${MODEL_BACKUP} 也失败了: ${error.message}`);
+            if (i < maxRetriesBackup - 1) await new Promise(r => setTimeout(r, 2000));
+        }
+    }
+
+    throw new Error("所有 AI 模型（主力+替补）均不可用，请稍后再试。");
 }
 
 // 八字分析接口
@@ -71,8 +104,6 @@ app.post('/api/analyze', async (req, res) => {
     const daYunStr = chart?.daYun ? chart.daYun.map(d => d.ganZhi).join(',') : "暂无";
     const balanceStr = chart?.balanceNote ? chart.balanceNote.join(', ') : "五行平衡";
     const lingShu = chart?.lingShu || { lifePathNumber: 0 };
-
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       【角色设定】
@@ -112,28 +143,25 @@ app.post('/api/analyze', async (req, res) => {
       }
     `;
 
-    console.log("正在请求 AI (深度八字分析)...");
-    const result = await generateWithRetry(model, prompt);
-    const text = result.response.text();
+    // 使用智能降级策略调用
+    const { text, modelUsed } = await generateSmartResponse(prompt);
     
-    // ✅ 使用智能提取器，彻底解决 JSON 解析错误
+    // 解析 JSON
     const jsonStr = extractJSON(text);
-    
     if (!jsonStr) {
         console.error("AI 返回原始内容:", text);
-        throw new Error("无法从 AI 返回中提取有效的 JSON 数据");
+        throw new Error(`AI (${modelUsed}) 返回数据格式异常`);
     }
 
     const data = JSON.parse(jsonStr);
+    
+    // 可选：在返回头里告诉前端用了哪个模型（方便调试）
+    res.set('X-Model-Used', modelUsed);
     res.json(data);
 
   } catch (error) {
-    console.error("API 错误:", error.message);
-    if (error.message.includes('503') || error.message.includes('overloaded')) {
-        res.status(503).json({ error: "AI 大脑过载（Google服务器繁忙），已自动重试多次仍失败，请稍后几秒再试。" });
-    } else {
-        res.status(500).json({ error: error.message });
-    }
+    console.error("最终失败:", error.message);
+    res.status(503).json({ error: "服务器正忙（已切换备用线路仍超时），请稍等 5 秒后再试！" });
   }
 });
 
@@ -141,8 +169,7 @@ app.post('/api/analyze', async (req, res) => {
 app.post('/api/qimen', async (req, res) => {
   try {
     const { type, context, result } = req.body; 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
+    
     const signalMap = { 'green': '🟢 可行动 (大吉)', 'yellow': '🟡 需观察 (平)', 'red': '🔴 不建议 (凶)' };
     const signalText = signalMap[result.signal];
 
@@ -169,21 +196,21 @@ app.post('/api/qimen', async (req, res) => {
       }
     `;
     
-    console.log("正在请求 AI (奇门决策)...");
-    const aiRes = await generateWithRetry(model, prompt);
-    const text = aiRes.response.text();
+    const { text, modelUsed } = await generateSmartResponse(prompt);
     
-    // ✅ 同样使用智能提取器
     const jsonStr = extractJSON(text);
-    if (!jsonStr) throw new Error("AI 奇门数据格式异常");
+    if (!jsonStr) throw new Error(`AI (${modelUsed}) 奇门数据格式异常`);
 
+    res.set('X-Model-Used', modelUsed);
     res.json(JSON.parse(jsonStr));
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(503).json({ error: "决策服务繁忙，请稍后再试。" });
   }
 });
 
 app.listen(port, () => {
   console.log(`✅ 后端服务器已启动: http://localhost:${port}`);
+  console.log(`   - 主力模型: ${MODEL_MAIN} (重试 4 次)`);
+  console.log(`   - 替补模型: ${MODEL_BACKUP} (重试 2 次)`);
 });
